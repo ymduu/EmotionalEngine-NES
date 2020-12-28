@@ -30,25 +30,25 @@ namespace nes { namespace detail {
 		m_Initialized = true;
 	}
 
-	void Cassette::ReadPrgRom(int offset, uint8_t* pBuffer, size_t size)
+	void Cassette::ReadPrgRom(uint8_t* pBuffer, int offset, size_t size)
 	{
 		assert(m_Initialized);
 		assert(offset + size <= m_PrgRomSize);
 		memcpy(pBuffer, m_PrgRom + offset, size);
 	}
-	void Cassette::WritePrgRom(int offset, const uint8_t* pBuffer, size_t size) 
+	void Cassette::WritePrgRom(const uint8_t* pBuffer, int offset, size_t size)
 	{
 		assert(m_Initialized);
 		assert(offset + size <= m_PrgRomSize);
 		memcpy(m_PrgRom + offset, pBuffer, size);
 	}
-	void Cassette::ReadChrRom(int offset, uint8_t* pBuffer, size_t size)
+	void Cassette::ReadChrRom(uint8_t* pBuffer, int offset, size_t size)
 	{
 		assert(m_Initialized);
 		assert(offset + size <= m_ChrRomSize);
 		memcpy(pBuffer, m_ChrRom + offset, size);
 	}
-	void Cassette::WriteChrRom(int offset, const uint8_t* pBuffer, size_t size)
+	void Cassette::WriteChrRom(const uint8_t* pBuffer, int offset, size_t size)
 	{
 		assert(m_Initialized);
 		assert(offset + size <= m_ChrRomSize);

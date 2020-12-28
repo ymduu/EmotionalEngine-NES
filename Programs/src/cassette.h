@@ -33,10 +33,10 @@ namespace nes { namespace detail {
 		{}
 		// ROM のバイナリを書き込んだバッファとそのサイズを引数にとって初期化
 		void Initialize(uint8_t* pBuffer, size_t bufferSize);
-		void ReadPrgRom(int offset, uint8_t* pBuffer, size_t size);
-		void WritePrgRom(int offset, const uint8_t* pBuffer, size_t size);
-		void ReadChrRom(int offset, uint8_t* pBuffer, size_t size);
-		void WriteChrRom(int offset, const uint8_t* pBuffer, size_t size);
+		void ReadPrgRom(uint8_t* pBuffer, int offset, size_t size);
+		void WritePrgRom(const uint8_t* pBuffer, int offset, size_t size);
+		void ReadChrRom(uint8_t* pBuffer, int offset, size_t size);
+		void WriteChrRom(const uint8_t* pBuffer, int offset, size_t size);
 	private:
 		uint8_t m_PrgRom[PRG_ROM_MAX];
 		uint8_t m_ChrRom[CHR_ROM_MAX];

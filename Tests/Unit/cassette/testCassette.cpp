@@ -23,15 +23,15 @@ int main()
 
     // TORIAEZU: PRG ROM から HELLO WORLD! がよめたらオッケー
     char buf[16];
-    cst.ReadPrgRom(97, reinterpret_cast<uint8_t*>(buf), 15);
+    cst.ReadPrgRom(reinterpret_cast<uint8_t*>(buf), 97, 15);
     std::cout << buf << "\n";
 
     char prgRom[2 * 16 * 1024];
     char chrRom[8 * 1024];
 
     // とりあえず全域が読めればオッケーとしておく
-    cst.ReadChrRom(0, reinterpret_cast<uint8_t*>(chrRom), 8 * 1024);
-    cst.ReadPrgRom(0, reinterpret_cast<uint8_t*>(prgRom), 2 * 16 * 1024);
+    cst.ReadChrRom(reinterpret_cast<uint8_t*>(chrRom), 0, 8 * 1024);
+    cst.ReadPrgRom(reinterpret_cast<uint8_t*>(prgRom), 0, 2 * 16 * 1024);
 
     return 0;
 }

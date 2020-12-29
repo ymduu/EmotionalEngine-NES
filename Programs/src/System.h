@@ -3,12 +3,9 @@
 #include "cassette.h"
 #include "constants.h"
 
-namespace nes {
-	namespace detail {
-		class CpuBus;
-	}
+namespace nes { namespace detail {
+	class CpuBus;
 
-	// システム全体を持つ公開クラス
 	class System {
 		friend detail::CpuBus;
 	public:
@@ -37,17 +34,15 @@ namespace nes {
 
 	};
 
-	namespace detail {
-		// System へのポインタを持ち、CPU から見えるメモリ空間に基づいてアクセスするクラス
-		class CpuBus {
-		public:
-			CpuBus(System* pSystem) 
-				:m_pSystem(pSystem)
-			{}
-			uint8_t ReadByte(uint16_t addr);
-			void WriteByte(uint16_t addr, uint8_t data);
-		private:
-			System* m_pSystem;
-		};
-	}
-}
+	// System へのポインタを持ち、CPU から見えるメモリ空間に基づいてアクセスするクラス
+	class CpuBus {
+	public:
+		CpuBus(System* pSystem) 
+			:m_pSystem(pSystem)
+		{}
+		uint8_t ReadByte(uint16_t addr);
+		void WriteByte(uint16_t addr, uint8_t data);
+	private:
+		System* m_pSystem;
+	};
+}}

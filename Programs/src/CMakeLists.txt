@@ -4,7 +4,9 @@ add_library(EmotionalNES
   STATIC
 	cassette.h
 	constants.h
-    cassette.cpp
+  System.h
+  cassette.cpp
+  System.cpp
   )
 
 # TODO: ライブラリのインクルードディレクトリを設定

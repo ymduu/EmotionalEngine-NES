@@ -2,10 +2,12 @@
 # 辞書順に配置すること
 add_library(EmotionalNES
   STATIC
-	cassette.h
-	constants.h
+  cassette.h
+  constants.h
+  Cpu.h
   System.h
   cassette.cpp
+  Cpu.cpp
   System.cpp
   )
 

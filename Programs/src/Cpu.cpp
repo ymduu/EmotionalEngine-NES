@@ -317,4 +317,104 @@ namespace nes { namespace detail {
 			break;
 		}
 	}
+
+    void Cpu::SetNegativeFlag(bool flag)
+    {
+        if (flag)
+        {
+            P |= (1 << 7);
+        }
+        else {
+            P &= ~(1 << 7);
+        }
+    }
+    void Cpu::SetOverflowFlag(bool flag)
+    {
+        if (flag)
+        {
+            P |= (1 << 6);
+        }
+        else {
+            P &= ~(1 << 6);
+        }
+    }
+    void Cpu::SetBreakFlag(bool flag)
+    {
+        if (flag)
+        {
+            P |= (1 << 4);
+        }
+        else {
+            P &= ~(1 << 4);
+        }
+    }
+    void Cpu::SetDecimalFlag(bool flag)
+    {
+        if (flag)
+        {
+            P |= (1 << 3);
+        }
+        else {
+            P &= ~(1 << 3);
+        }
+    }
+    void Cpu::SetInterruptFlag(bool flag)
+    {
+        if (flag)
+        {
+            P |= (1 << 2);
+        }
+        else {
+            P &= ~(1 << 2);
+        }
+    }
+    void Cpu::SetZeroFlag(bool flag)
+    {
+        if (flag)
+        {
+            P |= (1 << 1);
+        }
+        else {
+            P &= ~(1 << 1);
+        }
+    }
+    void Cpu::SetCarryFlag(bool flag)
+    {
+        if (flag)
+        {
+            P |= 1;
+        }
+        else {
+            P &= ~(1);
+        }
+    }
+
+    bool Cpu::GetNegativeFlag()
+    {
+        return (P & (1 << 7)) == (1 << 7);
+    }
+    bool Cpu::GetOverflowFlag()
+    {
+        return (P & (1 << 6)) == (1 << 6);
+    }
+    bool Cpu::GetBreakFlag()
+    {
+        return (P & (1 << 4)) == (1 << 4);
+    }
+    bool Cpu::GetDecimalFlag()
+    {
+        return (P & (1 << 3)) == (1 << 3);
+    }
+    bool Cpu::GetInterruptFlag()
+    {
+        return (P & (1 << 2)) == (1 << 2);
+    }
+    bool Cpu::GetZeroFlag()
+    {
+        return (P & (1 << 1)) == (1 << 1);
+    }
+    bool Cpu::GetCarryFlag()
+    {
+        return (P & 1) == 1;
+    }
 }}

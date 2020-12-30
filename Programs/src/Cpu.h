@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include "constants.h"
+#include "System.h"
 
 namespace nes { namespace detail {
     enum class Opcode {
@@ -92,4 +93,56 @@ namespace nes { namespace detail {
     };
 
     Instruction ByteToInstruction(uint8_t byte);
+
+    class Cpu {
+    public:
+        // 1命令実行し、実行にかかったクロックを返す
+        uint8_t Run();
+        // デバッグ出力用にサイクル数を数えておく
+        uint64_t m_CyclesForDebug;
+        // 今の状態をダンプする(nestest.log 形式と FCEUX 形式の両方に対応したい)
+        void PrintStatusForDebug();
+
+        Cpu(System* pSystem)
+            :m_CyclesForDebug(0)
+            ,A(0)
+            ,X(0)
+            ,Y(0)
+            ,PC(0)
+            ,SP(0)
+            ,P(1 << 5)
+            ,m_CpuBus(pSystem)
+        {}
+
+    private:
+        // レジスタ名は命名規則に従わない
+        uint8_t A;
+        uint8_t X;
+        uint8_t Y;
+        uint16_t PC;
+        uint16_t SP;
+        // 下から順番に、 CZIDB1VN
+        uint8_t P;
+
+        // CPU BUS 経由でシステムを読み書きする
+        CpuBus m_CpuBus;
+
+        // ステータスフラグをいじる関数
+        void SetNegativeFlag(bool flag);
+        void SetOverflowFlag(bool flag);
+        void SetBreakFlag(bool flag);
+        void SetDecimalFlag(bool flag);
+        void SetInterruptFlag(bool flag);
+        void SetZeroFlag(bool flag);
+        void SetCarryFlag(bool flag);
+
+        bool GetNegativeFlag();
+        bool GetOverflowFlag();
+        bool GetBreakFlag();
+        bool GetDecimalFlag();
+        bool GetInterruptFlag();
+        bool GetZeroFlag();
+        bool GetCarryFlag();
+
+    };
 }}

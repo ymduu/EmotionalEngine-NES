@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include <cstdlib>
 #include <stdint.h>
 #include "constants.h"
@@ -416,5 +417,189 @@ namespace nes { namespace detail {
     bool Cpu::GetCarryFlag()
     {
         return (P & 1) == 1;
+    }
+
+    void Cpu::FetchOperand(AddressingMode mode, uint8_t* pOutOperand, uint8_t* pOutAdditionalCyc)
+    {
+        assert(mode != AddressingMode::Implied);
+
+        *pOutOperand = 0;
+        *pOutAdditionalCyc = 0;
+
+        // PC は命令とオペランドのフェッチでは動かさず、命令実行後にまとめて動かす(デバッグログの実装で有利になる……はず)
+        if (mode == AddressingMode::Immediate)
+        {
+            *pOutOperand = m_CpuBus.ReadByte(PC + 1);
+        }
+        else if (mode == AddressingMode::Absolute)
+        {
+            uint16_t upper = 0;
+            uint16_t lower = 0;
+            lower = m_CpuBus.ReadByte(PC + 1);
+            upper = m_CpuBus.ReadByte(PC + 2);
+
+            uint16_t addr = 0;
+            addr |= lower;
+            addr |= (upper << 8);
+
+            *pOutOperand = m_CpuBus.ReadByte(addr);
+        }
+        else if (mode == AddressingMode::ZeroPage)
+        {
+            uint16_t addr = m_CpuBus.ReadByte(PC + 1);
+
+            *pOutOperand = m_CpuBus.ReadByte(addr);
+        }
+        else if (mode == AddressingMode::ZeroPageX)
+        {
+            uint8_t lower = m_CpuBus.ReadByte(PC + 1);
+            
+            // 上位バイトへの桁上げは無視、なので uint8 のまま加算する
+            lower += X;
+            *pOutOperand = m_CpuBus.ReadByte(lower);
+        }
+        else if (mode == AddressingMode::ZeroPageY)
+        {
+            uint8_t lower = m_CpuBus.ReadByte(PC + 1);
+
+            // 上位バイトへの桁上げは無視、なので uint8 のまま加算する
+            lower += Y;
+            *pOutOperand = m_CpuBus.ReadByte(lower);
+        }
+        else if (mode == AddressingMode::AbsoluteX)
+        {
+            uint16_t upper = 0;
+            uint16_t lower = 0;
+            lower = m_CpuBus.ReadByte(PC + 1);
+            upper = m_CpuBus.ReadByte(PC + 2);
+
+            uint16_t addr = 0;
+            addr |= lower;
+            addr |= (upper << 8);
+
+            uint16_t beforeAddr = addr;
+            addr += X;
+
+            *pOutOperand = m_CpuBus.ReadByte(addr);
+            // ページクロスで +1 クロック
+            if ((beforeAddr & 0xFF00) != (addr & 0xFF00))
+            {
+                *pOutAdditionalCyc = 1;
+            }
+
+        }
+        else if (mode == AddressingMode::AbsoluteY)
+        {
+            uint16_t upper = 0;
+            uint16_t lower = 0;
+            lower = m_CpuBus.ReadByte(PC + 1);
+            upper = m_CpuBus.ReadByte(PC + 2);
+
+            uint16_t addr = 0;
+            addr |= lower;
+            addr |= (upper << 8);
+
+            uint16_t beforeAddr = addr;
+            addr += Y;
+
+            *pOutOperand = m_CpuBus.ReadByte(addr);
+            // ページクロスで +1 クロック
+            if ((beforeAddr & 0xFF00) != (addr & 0xFF00))
+            {
+                *pOutAdditionalCyc = 1;
+            }
+        }
+        else if (mode == AddressingMode::Relative)
+        {
+            uint8_t offset = m_CpuBus.ReadByte(PC + 1);
+            // 符号拡張 する(若干怪しいので、バグったら疑う(最悪))
+            int32_t signedOffset = static_cast<int8_t>(offset);
+            int32_t signedPC = static_cast<int16_t>(PC);
+
+            int32_t signedAddr = signedPC + signedOffset;
+            // uint16_t に収まっていることを確認
+            assert(signedAddr >= 0 && signedAddr <= 0xFFFF);
+            uint16_t addr = static_cast<uint16_t>(signedAddr);
+
+            *pOutOperand = m_CpuBus.ReadByte(addr);
+            // ページクロスで +1 クロック、Relative はブランチ命令で使われるが、ブランチ成立時にはさらに +1 されることに注意する
+            if ((PC & 0xFF00) != (addr & 0xFF00))
+            {
+                *pOutAdditionalCyc = 1;
+            }
+        }
+        else if (mode == AddressingMode::IndirectX)
+        {
+            // **(lower + X)
+            uint8_t indirectLower = 0;
+            indirectLower = m_CpuBus.ReadByte(PC + 1);
+            // キャリーは無視 = オーバーフローしても気にしない
+            uint8_t indirectAddr = indirectLower + X;
+            uint16_t lower = m_CpuBus.ReadByte(indirectAddr);
+            uint16_t upper = m_CpuBus.ReadByte(indirectAddr + 1);
+
+            uint16_t addr = lower | (upper << 8);
+
+            // もう一回 dereference
+            *pOutOperand = m_CpuBus.ReadByte(addr);
+        }
+        else if (mode == AddressingMode::IndirectY)
+        {
+            // *(*(lower) + Y)
+            // キャリーは無視 = オーバーフローしても気にしない
+            uint8_t indirectAddr = m_CpuBus.ReadByte(PC + 1);
+            uint16_t lower = m_CpuBus.ReadByte(indirectAddr);
+            uint16_t upper = m_CpuBus.ReadByte(indirectAddr + 1);
+
+            uint16_t addr = lower | (upper << 8);
+            uint16_t beforeAddr = addr;
+
+            addr += Y;
+
+            // もう一回 dereference
+            *pOutOperand = m_CpuBus.ReadByte(addr);
+            // ページクロスで +1 クロック
+            if ((beforeAddr & 0xFF00) != (addr & 0xFF00))
+            {
+                *pOutAdditionalCyc = 1;
+            }
+        }
+        else if (mode == AddressingMode::Indirect)
+        {
+            // **(addr)
+            uint16_t indirectAddr = 0;
+            uint8_t indirectLower = 0;
+            uint8_t indirectUpper = 0;
+
+            indirectLower = m_CpuBus.ReadByte(PC + 1);
+            indirectUpper = m_CpuBus.ReadByte(PC + 2);
+
+            uint16_t addrLower = m_CpuBus.ReadByte(static_cast<uint16_t>(indirectLower) | (static_cast<uint16_t>(indirectUpper) << 8));
+            // インクリメントにおいて下位バイトからのキャリーを無視するために、下位バイトに加算してからキャストする(ほんまか？？？？？)
+            uint16_t addrUpper = m_CpuBus.ReadByte(static_cast<uint16_t>(indirectLower + 1) | (static_cast<uint16_t>(indirectUpper) << 8));
+
+            uint16_t addr = addrLower | (addrUpper << 8);
+            // もう一回 dereference
+            *pOutOperand = m_CpuBus.ReadByte(addr);
+        }
+        else
+        {
+            abort();
+        }
+    }
+
+
+    uint8_t Cpu::Run()
+    {
+        // 命令 フェッチ
+        uint8_t instByte = m_CpuBus.ReadByte(PC);
+        Instruction inst = ByteToInstruction(instByte);
+
+        if (inst.m_Opcode == Opcode::ADC)
+        {
+            // オペランド フェッチ
+        }
+
+        return 0;
     }
 }}

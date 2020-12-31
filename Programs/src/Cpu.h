@@ -144,9 +144,13 @@ namespace nes { namespace detail {
         bool GetZeroFlag();
         bool GetCarryFlag();
 
-        // アドレッシングモードによってオペランドをフェッチし、オペランドと追加クロックサイクルを返す
+        // アドレッシングモードによってオペランドのアドレスをフェッチし、アドレスと追加クロックサイクルを返す
+        // 以下は、アドレスを対象にする命令(例: ストア) -> FetchAddr, 値(参照を剥がして値にするものも含む)を対象にする命令(例: ADC) -> FetchArg と使い分ける
+
         // ブランチ条件成立時の追加クロックサイクルは考慮しないことに注意すること
-        void FetchOperand(AddressingMode mode, uint8_t* pOutOperand, uint8_t* pOutAdditionalCyc);
+        void FetchAddr(AddressingMode mode, uint16_t* pOutAddr, uint8_t* pOutAdditionalCyc);
+        // アドレッシングモードによってオペランドの参照を適切に剥がして値を返す
+        void FetchArg(AddressingMode mode, uint8_t* pOutValue, uint8_t* pOutAdditionalCyc);
 
     };
 }}

@@ -418,20 +418,17 @@ namespace nes { namespace detail {
     {
         return (P & 1) == 1;
     }
-
-    void Cpu::FetchOperand(AddressingMode mode, uint8_t* pOutOperand, uint8_t* pOutAdditionalCyc)
+    // 対象のアドレスをフェッチする君、値の取得レイヤーは一つ上の層をつくってそこでやる
+    void Cpu::FetchAddr(AddressingMode mode, uint16_t* pOutAddr, uint8_t* pOutAdditionalCyc)
     {
-        assert(mode != AddressingMode::Implied);
+        // アドレスじゃないはずの人らが来てたらプログラミングミスなので assert しとく
+        assert(mode != AddressingMode::Implied && mode != AddressingMode::Immediate && mode != AddressingMode::Accumulator);
 
-        *pOutOperand = 0;
+        *pOutAddr = 0;
         *pOutAdditionalCyc = 0;
 
         // PC は命令とオペランドのフェッチでは動かさず、命令実行後にまとめて動かす(デバッグログの実装で有利になる……はず)
-        if (mode == AddressingMode::Immediate)
-        {
-            *pOutOperand = m_CpuBus.ReadByte(PC + 1);
-        }
-        else if (mode == AddressingMode::Absolute)
+        if (mode == AddressingMode::Absolute)
         {
             uint16_t upper = 0;
             uint16_t lower = 0;
@@ -442,13 +439,13 @@ namespace nes { namespace detail {
             addr |= lower;
             addr |= (upper << 8);
 
-            *pOutOperand = m_CpuBus.ReadByte(addr);
+            *pOutAddr = addr;
         }
         else if (mode == AddressingMode::ZeroPage)
         {
             uint16_t addr = m_CpuBus.ReadByte(PC + 1);
 
-            *pOutOperand = m_CpuBus.ReadByte(addr);
+            *pOutAddr = addr;
         }
         else if (mode == AddressingMode::ZeroPageX)
         {
@@ -456,7 +453,7 @@ namespace nes { namespace detail {
             
             // 上位バイトへの桁上げは無視、なので uint8 のまま加算する
             lower += X;
-            *pOutOperand = m_CpuBus.ReadByte(lower);
+            *pOutAddr = lower;
         }
         else if (mode == AddressingMode::ZeroPageY)
         {
@@ -464,7 +461,7 @@ namespace nes { namespace detail {
 
             // 上位バイトへの桁上げは無視、なので uint8 のまま加算する
             lower += Y;
-            *pOutOperand = m_CpuBus.ReadByte(lower);
+            *pOutAddr = lower;
         }
         else if (mode == AddressingMode::AbsoluteX)
         {
@@ -480,7 +477,7 @@ namespace nes { namespace detail {
             uint16_t beforeAddr = addr;
             addr += X;
 
-            *pOutOperand = m_CpuBus.ReadByte(addr);
+            *pOutAddr = addr;
             // ページクロスで +1 クロック
             if ((beforeAddr & 0xFF00) != (addr & 0xFF00))
             {
@@ -502,7 +499,7 @@ namespace nes { namespace detail {
             uint16_t beforeAddr = addr;
             addr += Y;
 
-            *pOutOperand = m_CpuBus.ReadByte(addr);
+            *pOutAddr = addr;
             // ページクロスで +1 クロック
             if ((beforeAddr & 0xFF00) != (addr & 0xFF00))
             {
@@ -521,7 +518,7 @@ namespace nes { namespace detail {
             assert(signedAddr >= 0 && signedAddr <= 0xFFFF);
             uint16_t addr = static_cast<uint16_t>(signedAddr);
 
-            *pOutOperand = m_CpuBus.ReadByte(addr);
+            *pOutAddr = addr;
             // ページクロスで +1 クロック、Relative はブランチ命令で使われるが、ブランチ成立時にはさらに +1 されることに注意する
             if ((PC & 0xFF00) != (addr & 0xFF00))
             {
@@ -530,24 +527,25 @@ namespace nes { namespace detail {
         }
         else if (mode == AddressingMode::IndirectX)
         {
-            // **(lower + X)
+            // *(lower + X)
             uint8_t indirectLower = 0;
             indirectLower = m_CpuBus.ReadByte(PC + 1);
             // キャリーは無視 = オーバーフローしても気にしない
             uint8_t indirectAddr = indirectLower + X;
+            // Indirect なので、FetchAddr 内で1回参照を剥がす
             uint16_t lower = m_CpuBus.ReadByte(indirectAddr);
             uint16_t upper = m_CpuBus.ReadByte(indirectAddr + 1);
 
             uint16_t addr = lower | (upper << 8);
 
-            // もう一回 dereference
-            *pOutOperand = m_CpuBus.ReadByte(addr);
+            *pOutAddr = addr;
         }
         else if (mode == AddressingMode::IndirectY)
         {
-            // *(*(lower) + Y)
+            // *(lower) + Y
             // キャリーは無視 = オーバーフローしても気にしない
             uint8_t indirectAddr = m_CpuBus.ReadByte(PC + 1);
+            // Indirect なので、FetchAddr 内で1回参照を剥がす
             uint16_t lower = m_CpuBus.ReadByte(indirectAddr);
             uint16_t upper = m_CpuBus.ReadByte(indirectAddr + 1);
 
@@ -556,8 +554,7 @@ namespace nes { namespace detail {
 
             addr += Y;
 
-            // もう一回 dereference
-            *pOutOperand = m_CpuBus.ReadByte(addr);
+            *pOutAddr = addr;
             // ページクロスで +1 クロック
             if ((beforeAddr & 0xFF00) != (addr & 0xFF00))
             {
@@ -574,20 +571,47 @@ namespace nes { namespace detail {
             indirectLower = m_CpuBus.ReadByte(PC + 1);
             indirectUpper = m_CpuBus.ReadByte(PC + 2);
 
+            // Indirect なので、FetchAddr 内で1回参照を剥がす
             uint16_t addrLower = m_CpuBus.ReadByte(static_cast<uint16_t>(indirectLower) | (static_cast<uint16_t>(indirectUpper) << 8));
             // インクリメントにおいて下位バイトからのキャリーを無視するために、下位バイトに加算してからキャストする(ほんまか？？？？？)
             uint16_t addrUpper = m_CpuBus.ReadByte(static_cast<uint16_t>(indirectLower + 1) | (static_cast<uint16_t>(indirectUpper) << 8));
 
             uint16_t addr = addrLower | (addrUpper << 8);
-            // もう一回 dereference
-            *pOutOperand = m_CpuBus.ReadByte(addr);
+            *pOutAddr = addr;
         }
         else
         {
+            // unexpected default
             abort();
         }
     }
 
+    // アドレッシングモードといまの PC の値から命令でつかう引数(？)を取得する
+    void Cpu::FetchArg(AddressingMode mode, uint8_t* pOutValue, uint8_t* pOutAdditionalCyc)
+    {
+        // 引数を持たないアドレッシングモードで呼ばれたらプログラミングミスなので assert しとく
+        assert(mode != AddressingMode::Implied);
+
+        *pOutValue = 0;
+        *pOutAdditionalCyc = 0;
+
+        if (mode == AddressingMode::Accumulator)
+        {
+            *pOutValue = A;
+        }
+        else if (mode == AddressingMode::Immediate)
+        {
+            // Immediate は PC + 1 から素直に読む
+            *pOutValue = m_CpuBus.ReadByte(PC + 1);
+        }
+        else
+        {
+            // 他はアドレスがオペランドになってるはずなので、アドレスを持ってきて1回参照を剥がす(Indirect は2回参照を剥がす必要があるが、1回は FetchAddr 側で剥がしている)
+            uint16_t addr = 0;
+            FetchAddr(mode, &addr, pOutAdditionalCyc);
+            *pOutValue = m_CpuBus.ReadByte(addr);
+        }
+    }
 
     uint8_t Cpu::Run()
     {
@@ -598,6 +622,21 @@ namespace nes { namespace detail {
         if (inst.m_Opcode == Opcode::ADC)
         {
             // オペランド フェッチ
+            uint8_t operand;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &operand, &additionalCyc);
+
+            uint16_t calc = static_cast<uint16_t>(A) + operand + GetCarryFlag();
+            uint8_t res = static_cast<uint8_t>(calc);
+
+            SetCarryFlag(calc > 0xff);
+            SetZeroFlag(res == 0);
+            SetNegativeFlag((res & 0x80) == 0x80);
+            // http://forums.nesdev.com/viewtopic.php?t=6331
+            SetOverflowFlag(((A ^ res) & (operand ^ res) & 0x80) == 0x80);
+
+            A = res;
+            return inst.m_Cycles + additionalCyc;
         }
 
         return 0;

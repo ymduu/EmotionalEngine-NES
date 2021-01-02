@@ -3,6 +3,14 @@
 #include "constants.h"
 #include "System.h"
 
+#define ENABLE_DEBUG_LOG
+
+#if defined(ENABLE_DEBUG_LOG)
+#include <stdio.h>
+#include <iostream>
+#include <string>
+#include <algorithm>
+#endif
 namespace nes { namespace detail {
     enum class Opcode {
         ADC,
@@ -78,6 +86,14 @@ namespace nes { namespace detail {
         IndirectY,
     };
 
+    enum class InterruptType 
+    {
+        NMI,
+        RESET,
+        IRQ, 
+        BRK,
+    };
+
     class Instruction {
     public:
         Instruction(Opcode opcode, AddressingMode mode, uint8_t bytes, uint8_t cycles)
@@ -100,16 +116,19 @@ namespace nes { namespace detail {
         uint8_t Run();
         // デバッグ出力用にサイクル数を数えておく
         uint64_t m_CyclesForDebug;
+#if defined(ENABLE_DEBUG_LOG)
         // 今の状態をダンプする(nestest.log 形式と FCEUX 形式の両方に対応したい)
-        void PrintStatusForDebug();
+        void PrintStatusForDebug(uint64_t cycles, uint64_t instructions);
+#endif
+        void Interrupt(InterruptType type);
 
         Cpu(System* pSystem)
-            :m_CyclesForDebug(0)
+            :m_CyclesForDebug(7)
             ,A(0)
             ,X(0)
             ,Y(0)
             ,PC(0)
-            ,SP(0)
+            ,SP(0xFF)
             ,P(1 << 5)
             ,m_CpuBus(pSystem)
         {}
@@ -151,6 +170,10 @@ namespace nes { namespace detail {
         void FetchAddr(AddressingMode mode, uint16_t* pOutAddr, uint8_t* pOutAdditionalCyc);
         // アドレッシングモードによってオペランドの参照を適切に剥がして値を返す
         void FetchArg(AddressingMode mode, uint8_t* pOutValue, uint8_t* pOutAdditionalCyc);
+
+        // スタック 操作
+        void PushStack(uint8_t data);
+        uint8_t PopStack();
 
     };
 }}

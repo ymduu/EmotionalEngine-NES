@@ -511,7 +511,8 @@ namespace nes { namespace detail {
             uint8_t offset = m_CpuBus.ReadByte(PC + 1);
             // 符号拡張 する(若干怪しいので、バグったら疑う(最悪))
             int32_t signedOffset = static_cast<int8_t>(offset);
-            int32_t signedPC = static_cast<int16_t>(PC);
+            // TORIAEZU: フェッチ済としたときの PC を起点にする
+            int32_t signedPC = PC + 2;
 
             int32_t signedAddr = signedPC + signedOffset;
             // uint16_t に収まっていることを確認
@@ -613,13 +614,66 @@ namespace nes { namespace detail {
         }
     }
 
+    void Cpu::Interrupt(InterruptType type)
+    {
+        uint16_t lower = 0;
+        uint16_t upper = 0;
+
+        // 割り込みフラグをたてる
+        SetInterruptFlag(true);
+
+        // TODO: RESET 以外も実装する
+        if (type != nes::detail::InterruptType::RESET)
+        {
+            // TORIAEZU: RESET 以外はアボート
+            abort();
+        }
+
+        switch (type)
+        {
+        case nes::detail::InterruptType::NMI:
+            break;
+        case nes::detail::InterruptType::RESET:
+            lower = m_CpuBus.ReadByte(0xFFFC);
+            upper = m_CpuBus.ReadByte(0xFFFD);
+
+            // https://www.pagetable.com/?p=410
+            SP = 0xFD;
+
+            PC = lower | (upper << 8);
+            break;
+        case nes::detail::InterruptType::IRQ:
+            break;
+        case nes::detail::InterruptType::BRK:
+            break;
+        default:
+            break;
+        }
+    }
+
+    // stack は 0x0100-0x01FF であることに気を付ける
+    void Cpu::PushStack(uint8_t data)
+    {
+        m_CpuBus.WriteByte(SP | (1 << 8), data);
+        SP--;
+    }
+
+    uint8_t Cpu::PopStack()
+    {
+        SP++;
+        return m_CpuBus.ReadByte(SP | (1 << 8));
+    }
+
     uint8_t Cpu::Run()
     {
         // 命令 フェッチ
         uint8_t instByte = m_CpuBus.ReadByte(PC);
         Instruction inst = ByteToInstruction(instByte);
+        // TODO: 命令実行前に命令の disas と今の状態をログに出す
 
-        if (inst.m_Opcode == Opcode::ADC)
+        switch (inst.m_Opcode)
+        {
+        case Opcode::ADC:
         {
             // オペランド フェッチ
             uint8_t operand;
@@ -636,9 +690,850 @@ namespace nes { namespace detail {
             SetOverflowFlag(((A ^ res) & (operand ^ res) & 0x80) == 0x80);
 
             A = res;
+            // PC 進める
+            PC += inst.m_Bytes;
             return inst.m_Cycles + additionalCyc;
         }
+        case Opcode::AND:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
 
+            uint8_t res = A & arg;
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+            A = res;
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::ASL:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t res = arg << 1;
+
+            // MSB が立ってる時に左シフトしたら carry になる
+            bool carryFlag = (arg & 0x80) == 0x80;
+            bool zeroFlag = (res == 0);
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetCarryFlag(carryFlag);
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            if (inst.m_AddressingMode == AddressingMode::Accumulator)
+            {
+                A = res;
+            }
+            else
+            {
+                uint16_t addr;
+                uint8_t dummy;
+                FetchAddr(inst.m_AddressingMode, &addr, &dummy);
+                m_CpuBus.WriteByte(addr, res);
+            }
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::BCC:
+        {
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+
+            // キャリーフラグが立ってなかったら分岐
+            if (!GetCarryFlag())
+            {
+                PC = addr;
+                // 分岐成立時に + 1 クロックサイクル
+                return inst.m_Cycles + additionalCyc + 1;
+            }
+            else
+            {
+                PC += inst.m_Bytes;
+                return inst.m_Cycles + additionalCyc;
+            }
+        }
+        case Opcode::BCS:
+        {
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+
+            if (GetCarryFlag())
+            {
+                PC = addr;
+                return inst.m_Cycles + additionalCyc + 1;
+            }
+            else
+            {
+                PC += inst.m_Bytes;
+                return inst.m_Cycles + additionalCyc;
+            }
+        }
+        case Opcode::BEQ:
+        {
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+
+            if (GetZeroFlag())
+            {
+                PC = addr;
+                return inst.m_Cycles + additionalCyc + 1;
+            }
+            else
+            {
+                PC += inst.m_Bytes;
+                return inst.m_Cycles + additionalCyc;
+            }
+        }
+        case Opcode::BIT:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            bool negativeFlag = (arg & 0x80) == 0x80;
+            bool overflowFlag = (arg & 0x40) == 0x40;
+            // Set if the result if the AND is zero(？？？？？？？)
+            bool zeroFlag = (A & arg) == 0;
+
+            SetNegativeFlag(negativeFlag);
+            SetOverflowFlag(overflowFlag);
+            SetZeroFlag(zeroFlag);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::BMI:
+        {
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+
+            if (GetNegativeFlag())
+            {
+                PC = addr;
+                return inst.m_Cycles + additionalCyc + 1;
+            }
+            else
+            {
+                PC += inst.m_Bytes;
+                return inst.m_Cycles + additionalCyc;
+            }
+        }
+        case Opcode::BNE:
+        {
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+
+            if (!GetZeroFlag())
+            {
+                PC = addr;
+                return inst.m_Cycles + additionalCyc + 1;
+            }
+            else
+            {
+                PC += inst.m_Bytes;
+                return inst.m_Cycles + additionalCyc;
+            }
+        }
+        case Opcode::BPL:
+        {
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+
+            if (!GetNegativeFlag())
+            {
+                PC = addr;
+                return inst.m_Cycles + additionalCyc + 1;
+            }
+            else
+            {
+                PC += inst.m_Bytes;
+                return inst.m_Cycles + additionalCyc;
+            }
+        }
+        case Opcode::BRK:
+        {
+            SetBreakFlag(true);
+            Interrupt(InterruptType::BRK);
+            return inst.m_Cycles;
+        }
+        case Opcode::BVC:
+        {
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+
+            if (!GetOverflowFlag())
+            {
+                PC = addr;
+                return inst.m_Cycles + additionalCyc + 1;
+            }
+            else
+            {
+                PC += inst.m_Bytes;
+                return inst.m_Cycles + additionalCyc;
+            }
+        }
+        case Opcode::BVS:
+        {
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+
+            if (GetOverflowFlag())
+            {
+                PC = addr;
+                return inst.m_Cycles + additionalCyc + 1;
+            }
+            else
+            {
+                PC += inst.m_Bytes;
+                return inst.m_Cycles + additionalCyc;
+            }
+        }
+        case Opcode::CLC:
+        {
+            SetCarryFlag(false);
+            return inst.m_Cycles;
+        }
+        case Opcode::CLD:
+        {
+            SetDecimalFlag(false);
+            return inst.m_Cycles;
+        }
+        case Opcode::CLI:
+        {
+            SetInterruptFlag(false);
+            return inst.m_Cycles;
+        }
+        case Opcode::CLV:
+        {
+            SetOverflowFlag(false);
+            return inst.m_Cycles;
+        }
+        case Opcode::CMP:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t res = A - arg;
+
+            bool carryFlag = A >= arg;
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetCarryFlag(carryFlag);
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::CPX:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t res = X - arg;
+
+            bool carryFlag = X >= arg;
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetCarryFlag(carryFlag);
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::CPY:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t res = Y - arg;
+
+            bool carryFlag = Y >= arg;
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetCarryFlag(carryFlag);
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::DEC:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            uint16_t addr;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t res = arg - 1;
+
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+            m_CpuBus.WriteByte(addr, res);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::DEX:
+        {
+            // implied のみ
+            uint8_t res = X - 1;
+
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+            X = res;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::DEY:
+        {
+            // implied のみ
+            uint8_t res = Y - 1;
+
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+            Y = res;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::EOR:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t res = A ^ arg;
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            A = res;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::INC:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            uint16_t addr;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t res = arg + 1;
+
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+            m_CpuBus.WriteByte(addr, res);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::INX:
+        {
+            // implied のみ
+            uint8_t res = X + 1;
+
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+            X = res;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::INY:
+        {
+            // implied のみ
+            uint8_t res = Y + 1;
+
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+            Y = res;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::JMP:
+        {
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            assert(additionalCyc == 0);
+
+            PC = addr;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::JSR:
+        {
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            assert(additionalCyc == 0);
+
+            // リターンアドレスは PC + 3 だが、それから 1 を引いたものを stack にプッシュする(そういう仕様)
+            uint16_t retAddr = PC + 2;
+
+            // upper -> lower の順に push
+            PushStack(static_cast<uint8_t>(retAddr >> 8));
+            PushStack(static_cast<uint8_t>(retAddr & 0xFF));
+
+            PC = addr;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::LDA:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            bool zeroFlag = arg == 0;
+            bool negativeFlag = (arg & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+            A = arg;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::LDX:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            bool zeroFlag = arg == 0;
+            bool negativeFlag = (arg & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+            X = arg;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::LDY:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            bool zeroFlag = arg == 0;
+            bool negativeFlag = (arg & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+            Y = arg;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::LSR:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            uint16_t addr;
+
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t res = arg >> 1;
+
+            bool carryFlag = (arg & 1) == 1;
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetCarryFlag(carryFlag);
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            if (inst.m_AddressingMode == AddressingMode::Accumulator)
+            {
+                A = res;
+            }
+            else 
+            {
+                m_CpuBus.WriteByte(addr, res);
+            }
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::NOP:
+        {
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::ORA:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t res = A | arg;
+
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) & res;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            A = res;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::PHA:
+        {
+            PushStack(A);
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::PHP:
+        {
+            PushStack(P);
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::PLA:
+        {
+            uint8_t res = PopStack();
+
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+            A = res;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::PLP:
+        {
+            uint8_t res = PopStack();
+
+            P = res;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::ROL:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            uint16_t addr;
+
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t res = arg << 1;
+            res |= GetCarryFlag() ? 1 : 0;
+
+            bool carryFlag = (arg & 0x80) == 0x80;
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetCarryFlag(carryFlag);
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            if (inst.m_AddressingMode == AddressingMode::Accumulator)
+            {
+                A = res;
+            }
+            else 
+            {
+                m_CpuBus.WriteByte(addr, res);
+            }
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::ROR:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            uint16_t addr;
+
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t res = arg >> 1;
+            res |= GetCarryFlag() ? 0x80 : 0;
+
+            bool carryFlag = (arg & 1) == 1;
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetCarryFlag(carryFlag);
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            if (inst.m_AddressingMode == AddressingMode::Accumulator)
+            {
+                A = res;
+            }
+            else
+            {
+                m_CpuBus.WriteByte(addr, res);
+            }
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::RTI:
+        {
+            P = PopStack();
+            uint16_t lower = PopStack();
+            uint16_t upper = PopStack();
+            PC = lower | (upper << 8);
+            
+            return inst.m_Cycles;
+        }
+        case Opcode::RTS:
+        {
+            uint16_t lower = PopStack();
+            uint16_t upper = PopStack();
+            PC = lower | (upper << 8);
+
+            return inst.m_Cycles;
+        }
+        case Opcode::SBC:
+        {
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint16_t calc = static_cast<uint16_t>(A) - arg - !GetCarryFlag();
+            uint8_t res = static_cast<uint8_t>(calc);
+
+            bool overflowFlag = (((A ^ calc) & 0x80) != 0 && ((A ^ arg) & 0x80) != 0);
+            bool carryFlag = calc >= 0;
+            bool negativeFlag = (calc & 0x80) == 0x80;
+            bool zeroFlag = res == 0;
+
+            SetOverflowFlag(overflowFlag);
+            SetCarryFlag(carryFlag);
+            SetNegativeFlag(negativeFlag);
+            SetZeroFlag(zeroFlag);
+
+            A = res;
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::SEC:
+        {
+            SetCarryFlag(true);
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::SED:
+        {
+            SetDecimalFlag(true);
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::SEI:
+        {
+            SetInterruptFlag(true);
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::STA:
+        {
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+
+            m_CpuBus.WriteByte(addr, A);
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::STX:
+        {
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+
+            m_CpuBus.WriteByte(addr, X);
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::STY:
+        {
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+
+            m_CpuBus.WriteByte(addr, Y);
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::TAX:
+        {
+            bool zeroFlag = A == 0;
+            bool negativeFlag = (A & 0x80) == 0x80;
+
+            X = A;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::TAY:
+        {
+            bool zeroFlag = A == 0;
+            bool negativeFlag = (A & 0x80) == 0x80;
+
+            Y = A;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::TSX:
+        {
+            uint8_t res = static_cast<uint8_t>(SP & 0xFF);
+
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            X = res;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::TXA:
+        {
+            bool zeroFlag = X == 0;
+            bool negativeFlag = (X & 0x80) == 0x80;
+
+            A = X;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::TXS:
+        {
+            // 1 Byte しか使わない
+            SP = static_cast<uint16_t>(X);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::TYA:
+        {
+            bool zeroFlag = Y == 0;
+            bool negativeFlag = (Y & 0x80) == 0x80;
+
+            A = Y;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+
+
+        default:
+            // unexpected default
+            abort();
+            break;
+        }
         return 0;
     }
+#if defined(ENABLE_DEBUG_LOG)
+    // 今の状態をダンプする(nestest.log 形式と FCEUX 形式の両方に対応したい)
+    void Cpu::PrintStatusForDebug(uint64_t cycles, uint64_t instructions)
+    {
+        printf("c");
+        printf("%-12llu", cycles);
+        printf("i");
+        printf("%-12llu", instructions);
+        printf("A:%02hhX X:%02hhX Y:%02hhX S:%02hhX ", A, X, Y, SP);
+
+        std::string regs = "czidbuvn";
+        std::string res;
+        for (int i = 0; i < 8; i++) 
+        {
+            if (((1 << i) & P) && i != 5) 
+            {
+                res = static_cast<char>(toupper(regs[i])) + res;
+            }
+            else
+            {
+                res = regs[i] + res;
+            }
+        }
+
+        std::cout << "P:" << res << "  ";
+        printf("$%X: ", PC);
+
+        uint8_t opcode = m_CpuBus.ReadByte(PC);
+        Instruction inst = ByteToInstruction(opcode);
+
+        for (int i = PC; i < PC + inst.m_Bytes; i++) {
+            printf("%02hhX ", m_CpuBus.ReadByte(i));
+        }
+        printf("\n");
+    }
+#endif
 }}

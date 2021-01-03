@@ -5,6 +5,7 @@
 #include <memory>
 #include <testUtil.h>
 #include <System.h>
+#include <Cpu.h>
 
 // HELLO WORLD Ç∑ÇÈ ROM ì«Ç›çûÇﬁ
 void ReadHelloWorldNes(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
@@ -59,9 +60,34 @@ void TestSystem_ReadWrite()
     std::cout << "====" << __FUNCTION__ << " END ====\n";
 }
 
+// Hello World
+void TestSystem_HelloWorld()
+{
+    std::cout << "====" << __FUNCTION__ << "====\n";
+    std::shared_ptr<uint8_t[]> rom;
+    size_t size;
+    ReadHelloWorldNes(&rom, &size);
+    nes::detail::System sys(rom.get(), size);
+    nes::detail::Cpu cpu(&sys);
+
+    cpu.Interrupt(nes::detail::InterruptType::RESET);
+
+    uint64_t clk = 7;
+    uint64_t inst = 1;
+
+    for (int i = 0; i < 175; i++) {
+        cpu.PrintStatusForDebug(clk, inst);
+        clk += cpu.Run();
+        inst++;
+    }
+
+    std::cout << "====" << __FUNCTION__ << " END ====\n";
+}
+
 int main()
 {
     TestSystem_ReadWrite();
+    TestSystem_HelloWorld();
 
     return 0;
 }

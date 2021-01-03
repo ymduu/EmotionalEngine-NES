@@ -114,8 +114,7 @@ namespace nes { namespace detail {
     public:
         // 1命令実行し、実行にかかったクロックを返す
         uint8_t Run();
-        // デバッグ出力用にサイクル数を数えておく
-        uint64_t m_CyclesForDebug;
+
 #if defined(ENABLE_DEBUG_LOG)
         // 今の状態をダンプする(nestest.log 形式と FCEUX 形式の両方に対応したい)
         void PrintStatusForDebug(uint64_t cycles, uint64_t instructions);
@@ -123,8 +122,7 @@ namespace nes { namespace detail {
         void Interrupt(InterruptType type);
 
         Cpu(System* pSystem)
-            :m_CyclesForDebug(7)
-            ,A(0)
+            :A(0)
             ,X(0)
             ,Y(0)
             ,PC(0)

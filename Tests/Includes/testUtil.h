@@ -13,4 +13,5 @@ namespace test {
 	void ReadFile(std::filesystem::path path, std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize);
 
 	void LogCpuStatusFceuxStyle(nes::detail::CpuInfo* info, uint64_t cycles, uint64_t instructions);
+	void LogCpuStatusNesTestStyle(nes::detail::CpuInfo* info, uint64_t cycles, uint64_t instructions);
 }

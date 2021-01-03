@@ -73,4 +73,21 @@ namespace test {
 		}
 		printf("\n");
 	}
+
+	void LogCpuStatusNesTestStyle(nes::detail::CpuInfo* info, uint64_t cycles, uint64_t instructions)
+	{
+		printf("%X  ", info->PC);
+		for (int i = 0; i < 3; i++) {
+			if (i < info->m_Instruction.m_Bytes)
+			{
+				printf("%02hhX ", info->m_InstructionBytes[i]);
+			}
+			else
+			{
+				printf("   ");
+			}
+		}
+		printf("                                 ");
+		printf("A:%02hhX X:%02hhX Y:%02hhX P:%2hhX SP:%02hhX CYC:%llu\n", info->A, info->X, info->Y, info->P, info->SP, cycles);
+	}
 }

@@ -143,6 +143,8 @@ namespace nes { namespace detail {
         // CPU の現在の状態を返す
         CpuInfo GetCpuInfoForDebug();
         void Interrupt(InterruptType type);
+        // nestest.nes 用に PC を外部からセットできる関数を公開する
+        void SetPCForDebug(uint16_t newPC);
 
         Cpu(System* pSystem)
             :A(0)

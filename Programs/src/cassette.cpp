@@ -33,8 +33,20 @@ namespace nes { namespace detail {
 	void Cassette::ReadPrgRom(uint8_t* pBuffer, int offset, size_t size)
 	{
 		assert(m_Initialized);
-		assert(offset + size <= m_PrgRomSize);
-		memcpy(pBuffer, m_PrgRom + offset, size);
+
+		for (size_t i = 0; i < size; i++)
+		{
+			// ROM ‚ª 16 KB ‚Ìê‡‚Ìƒ~ƒ‰[ƒŠƒ“ƒO
+			if (i + offset >= m_PrgRomSize) 
+			{
+				size_t idx = (i + offset) % m_PrgRomSize;
+				pBuffer[i] = m_PrgRom[idx];
+			}
+			else
+			{
+				pBuffer[i] = m_PrgRom[i + offset];
+			}
+		}
 	}
 	void Cassette::WritePrgRom(const uint8_t* pBuffer, int offset, size_t size)
 	{

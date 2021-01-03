@@ -1517,4 +1517,9 @@ namespace nes { namespace detail {
 
         return CpuInfo(A, X, Y, PC, SP, P, inst, instBytes, sizeof(instBytes));
     }
+
+    void Cpu::SetPCForDebug(uint16_t newPC)
+    {
+        PC = newPC;
+    }
 }}

@@ -76,7 +76,8 @@ void TestSystem_HelloWorld()
     uint64_t inst = 1;
 
     for (int i = 0; i < 175; i++) {
-        cpu.PrintStatusForDebug(clk, inst);
+        auto info = cpu.GetCpuInfoForDebug();
+        test::LogCpuStatusFceuxStyle(&info, clk, inst);
         clk += cpu.Run();
         inst++;
     }

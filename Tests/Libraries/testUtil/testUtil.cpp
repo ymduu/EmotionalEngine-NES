@@ -42,4 +42,35 @@ namespace test {
 		*pOutBuf = buf;
 		*pOutSize = size;
 	}
+
+	void LogCpuStatusFceuxStyle(nes::detail::CpuInfo* info, uint64_t cycles, uint64_t instructions)
+	{
+		printf("c");
+		printf("%-12llu", cycles);
+		printf("i");
+		printf("%-12llu", instructions);
+		printf("A:%02hhX X:%02hhX Y:%02hhX S:%02hhX ", info->A, info->X, info->Y, info->SP);
+
+		std::string regs = "czidbuvn";
+		std::string res;
+		for (int i = 0; i < 8; i++)
+		{
+			if (((1 << i) & info->P) && i != 5)
+			{
+				res = static_cast<char>(toupper(regs[i])) + res;
+			}
+			else
+			{
+				res = regs[i] + res;
+			}
+		}
+
+		std::cout << "P:" << res << "  ";
+		printf("$%X: ", info->PC);
+
+		for (int i = 0; i < info->m_Instruction.m_Bytes; i++) {
+			printf("%02hhX ", info->m_InstructionBytes[i]);
+		}
+		printf("\n");
+	}
 }

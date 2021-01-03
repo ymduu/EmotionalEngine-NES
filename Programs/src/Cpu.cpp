@@ -1500,40 +1500,21 @@ namespace nes { namespace detail {
         }
         return 0;
     }
-#if defined(ENABLE_DEBUG_LOG)
-    // 今の状態をダンプする(nestest.log 形式と FCEUX 形式の両方に対応したい)
-    void Cpu::PrintStatusForDebug(uint64_t cycles, uint64_t instructions)
+
+    CpuInfo Cpu::GetCpuInfoForDebug()
     {
-        printf("c");
-        printf("%-12llu", cycles);
-        printf("i");
-        printf("%-12llu", instructions);
-        printf("A:%02hhX X:%02hhX Y:%02hhX S:%02hhX ", A, X, Y, SP);
-
-        std::string regs = "czidbuvn";
-        std::string res;
-        for (int i = 0; i < 8; i++) 
-        {
-            if (((1 << i) & P) && i != 5) 
-            {
-                res = static_cast<char>(toupper(regs[i])) + res;
-            }
-            else
-            {
-                res = regs[i] + res;
-            }
-        }
-
-        std::cout << "P:" << res << "  ";
-        printf("$%X: ", PC);
-
+        // いまの PC から 命令 取得
         uint8_t opcode = m_CpuBus.ReadByte(PC);
         Instruction inst = ByteToInstruction(opcode);
+        uint8_t instBytes[3];
 
-        for (int i = PC; i < PC + inst.m_Bytes; i++) {
-            printf("%02hhX ", m_CpuBus.ReadByte(i));
+        assert(inst.m_Bytes <= 3);
+        for (int i = 0; i < inst.m_Bytes; i++)
+        {
+            uint8_t byte = m_CpuBus.ReadByte(i + PC);
+            instBytes[i] = byte;
         }
-        printf("\n");
+
+        return CpuInfo(A, X, Y, PC, SP, P, inst, instBytes, sizeof(instBytes));
     }
-#endif
 }}

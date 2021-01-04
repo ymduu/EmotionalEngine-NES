@@ -907,21 +907,25 @@ namespace nes { namespace detail {
         case Opcode::CLC:
         {
             SetCarryFlag(false);
+            PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
         case Opcode::CLD:
         {
             SetDecimalFlag(false);
+            PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
         case Opcode::CLI:
         {
             SetInterruptFlag(false);
+            PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
         case Opcode::CLV:
         {
             SetOverflowFlag(false);
+            PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
         case Opcode::CMP:
@@ -1178,9 +1182,12 @@ namespace nes { namespace detail {
         {
             uint8_t arg;
             uint8_t additionalCyc;
-            uint16_t addr;
+            uint16_t addr = 0;;
 
-            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            if (inst.m_AddressingMode != AddressingMode::Accumulator)
+            {
+                FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            }
             FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
 
             uint8_t res = arg >> 1;
@@ -1268,9 +1275,12 @@ namespace nes { namespace detail {
         {
             uint8_t arg;
             uint8_t additionalCyc;
-            uint16_t addr;
+            uint16_t addr = 0;
 
-            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            if (inst.m_AddressingMode != AddressingMode::Accumulator)
+            {
+                FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            }
             FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
 
             uint8_t res = arg << 1;
@@ -1300,9 +1310,12 @@ namespace nes { namespace detail {
         {
             uint8_t arg;
             uint8_t additionalCyc;
-            uint16_t addr;
+            uint16_t addr = 0;;
 
-            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            if (inst.m_AddressingMode != AddressingMode::Accumulator)
+            {
+                FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            }
             FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
 
             uint8_t res = arg >> 1;
@@ -1343,6 +1356,8 @@ namespace nes { namespace detail {
             uint16_t upper = PopStack();
             PC = lower | (upper << 8);
 
+            // JSR でスタックにプッシュされるアドレスは JSR の最後のアドレスで、RTS 側でインクリメントされる
+            PC++;
             return inst.m_Cycles;
         }
         case Opcode::SBC:

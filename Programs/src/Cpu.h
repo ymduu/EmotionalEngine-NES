@@ -3,14 +3,6 @@
 #include "constants.h"
 #include "System.h"
 
-#define ENABLE_DEBUG_LOG
-
-#if defined(ENABLE_DEBUG_LOG)
-#include <stdio.h>
-#include <iostream>
-#include <string>
-#include <algorithm>
-#endif
 namespace nes { namespace detail {
     enum class Opcode {
         ADC,
@@ -110,16 +102,49 @@ namespace nes { namespace detail {
 
     Instruction ByteToInstruction(uint8_t byte);
 
+	// デバッグ用 CPU情報出力構造体
+    // 命令長は Instruction が保持することに気を付ける
+	struct CpuInfo
+	{
+		// レジスタ名は命名規則に従わない
+		uint8_t A;
+		uint8_t X;
+		uint8_t Y;
+		uint16_t PC;
+		uint16_t SP;
+		// 下から順番に、 CZIDB1VN
+		uint8_t P;
+
+		Instruction m_Instruction;
+        uint8_t m_InstructionBytes[3];
+
+        CpuInfo(uint8_t a, uint8_t x, uint8_t y, uint16_t pc, uint16_t sp, uint8_t p, Instruction inst, uint8_t* pBytes, size_t bufferSize)
+            :A(a)
+            ,X(x)
+            ,Y(y)
+            ,PC(pc)
+            ,SP(sp)
+            ,P(p)
+            ,m_Instruction(inst)
+        {
+            assert(bufferSize >= inst.m_Bytes);
+            for (int i = 0; i < inst.m_Bytes; i++)
+            {
+                m_InstructionBytes[i] = pBytes[i];
+            }
+        }
+	};
+
     class Cpu {
     public:
         // 1命令実行し、実行にかかったクロックを返す
         uint8_t Run();
 
-#if defined(ENABLE_DEBUG_LOG)
-        // 今の状態をダンプする(nestest.log 形式と FCEUX 形式の両方に対応したい)
-        void PrintStatusForDebug(uint64_t cycles, uint64_t instructions);
-#endif
+        // CPU の現在の状態を返す
+        CpuInfo GetCpuInfoForDebug();
         void Interrupt(InterruptType type);
+        // nestest.nes 用に PC を外部からセットできる関数を公開する
+        void SetPCForDebug(uint16_t newPC);
 
         Cpu(System* pSystem)
             :A(0)

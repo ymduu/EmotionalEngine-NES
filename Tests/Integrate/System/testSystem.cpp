@@ -18,6 +18,17 @@ void ReadHelloWorldNes(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
 
     test::ReadFile(nesFile, pOutBuf, pOutSize);
 }
+// nestest.nes 読み込む
+void ReadNesTestNes(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
+{
+    auto rootPath = test::GetRepositoryRootPath();
+    assert(rootPath);
+
+    auto nesFile = rootPath.value();
+    nesFile += "/Tests/TestBinaries/nestest/nestest.nes";
+
+    test::ReadFile(nesFile, pOutBuf, pOutSize);
+}
 
 // 各アドレスを読み書きする、とりあえず WRAM とカセット だけ
 void TestSystem_ReadWrite()
@@ -76,7 +87,36 @@ void TestSystem_HelloWorld()
     uint64_t inst = 1;
 
     for (int i = 0; i < 175; i++) {
-        cpu.PrintStatusForDebug(clk, inst);
+        auto info = cpu.GetCpuInfoForDebug();
+        test::LogCpuStatusFceuxStyle(&info, clk, inst);
+        clk += cpu.Run();
+        inst++;
+    }
+
+    std::cout << "====" << __FUNCTION__ << " END ====\n";
+}
+
+// nestest.nes
+void TestSystem_NesTest()
+{
+    std::cout << "====" << __FUNCTION__ << "====\n";
+    std::shared_ptr<uint8_t[]> rom;
+    size_t size;
+    ReadNesTestNes(&rom, &size);
+    nes::detail::System sys(rom.get(), size);
+    nes::detail::Cpu cpu(&sys);
+
+    cpu.Interrupt(nes::detail::InterruptType::RESET);
+
+    // CPU だけで実行するために、 PC を 0xC000 にセット
+    cpu.SetPCForDebug(0xC000);
+
+    uint64_t clk = 0;
+    uint64_t inst = 1;
+
+    for (int i = 0; i < 8991; i++) {
+        auto info = cpu.GetCpuInfoForDebug();
+        test::LogCpuStatusNesTestStyle(&info, clk * 3, inst);
         clk += cpu.Run();
         inst++;
     }
@@ -88,6 +128,7 @@ int main()
 {
     TestSystem_ReadWrite();
     TestSystem_HelloWorld();
+    //TestSystem_NesTest();
 
     return 0;
 }

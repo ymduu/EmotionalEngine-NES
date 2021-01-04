@@ -6,6 +6,8 @@ add_library(testUtil
     testUtil.cpp
   )
 
+# テストライブラリは実装のすべてのヘッダをインクルードできる
 target_include_directories(testUtil
   PUBLIC ${PROJECT_SOURCE_DIR}/Tests/Includes
+  PUBLIC ${PROJECT_SOURCE_DIR}/Programs/src
   )

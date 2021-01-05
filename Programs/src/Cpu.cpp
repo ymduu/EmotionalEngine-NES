@@ -572,10 +572,13 @@ namespace nes { namespace detail {
             indirectLower = m_CpuBus.ReadByte(PC + 1);
             indirectUpper = m_CpuBus.ReadByte(PC + 2);
 
+            // インクリメントにおいて下位バイトからのキャリーを無視するために、下位バイトに加算してからキャストする(ほんまか？？？？？)
+            // 符号なし整数の加算のオーバーフロー時の挙動を期待しているので、未定義かも(TODO: 調べる)
+            uint8_t indirectLower2 = indirectLower + 1;
+
             // Indirect なので、FetchAddr 内で1回参照を剥がす
             uint16_t addrLower = m_CpuBus.ReadByte(static_cast<uint16_t>(indirectLower) | (static_cast<uint16_t>(indirectUpper) << 8));
-            // インクリメントにおいて下位バイトからのキャリーを無視するために、下位バイトに加算してからキャストする(ほんまか？？？？？)
-            uint16_t addrUpper = m_CpuBus.ReadByte(static_cast<uint16_t>(indirectLower + 1) | (static_cast<uint16_t>(indirectUpper) << 8));
+            uint16_t addrUpper = m_CpuBus.ReadByte(static_cast<uint16_t>(indirectLower2) | (static_cast<uint16_t>(indirectUpper) << 8));
 
             uint16_t addr = addrLower | (addrUpper << 8);
             *pOutAddr = addr;
@@ -1244,7 +1247,8 @@ namespace nes { namespace detail {
         }
         case Opcode::PHP:
         {
-            PushStack(P);
+            // http://wiki.nesdev.com/w/index.php/Status_flags: P の 4bit 目と 5bit 目を立ててスタックにプッシュ
+            PushStack(P | B_FLAG_MASK);
             PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
@@ -1266,7 +1270,8 @@ namespace nes { namespace detail {
         {
             uint8_t res = PopStack();
 
-            P = res;
+            // http://wiki.nesdev.com/w/index.php/Status_flags: Pの 4bit 目と 5bit 目は更新しない
+            P = (res & ~B_FLAG_MASK) | (P & B_FLAG_MASK);
 
             PC += inst.m_Bytes;
             return inst.m_Cycles;

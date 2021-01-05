@@ -99,7 +99,7 @@ void TestSystem_HelloWorld()
 // nestest.nes
 void TestSystem_NesTest()
 {
-    std::cout << "====" << __FUNCTION__ << "====\n";
+    //std::cout << "====" << __FUNCTION__ << "====\n";
     std::shared_ptr<uint8_t[]> rom;
     size_t size;
     ReadNesTestNes(&rom, &size);
@@ -114,7 +114,7 @@ void TestSystem_NesTest()
     uint64_t clk = 0;
     uint64_t inst = 1;
 
-    for (int i = 0; i < 8991; i++) {
+    for (int i = 0; i < 4974; i++) {
         auto info = cpu.GetCpuInfoForDebug();
         test::LogCpuStatusNesTestStyle(&info, clk * 3, inst);
         clk += cpu.Run();
@@ -126,9 +126,9 @@ void TestSystem_NesTest()
 
 int main()
 {
-    TestSystem_ReadWrite();
-    TestSystem_HelloWorld();
-    //TestSystem_NesTest();
+    //TestSystem_ReadWrite();
+    //TestSystem_HelloWorld();
+    TestSystem_NesTest();
 
     return 0;
 }

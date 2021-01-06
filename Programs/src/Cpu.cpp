@@ -1350,7 +1350,11 @@ namespace nes { namespace detail {
         }
         case Opcode::RTI:
         {
-            P = PopStack();
+            uint8_t res = PopStack();
+
+            // http://wiki.nesdev.com/w/index.php/Status_flags: P‚Ì 4bit –Ú‚Æ 5bit –Ú‚ÍXV‚µ‚È‚¢
+            P = (res & ~B_FLAG_MASK) | (P & B_FLAG_MASK);
+
             uint16_t lower = PopStack();
             uint16_t upper = PopStack();
             PC = lower | (upper << 8);

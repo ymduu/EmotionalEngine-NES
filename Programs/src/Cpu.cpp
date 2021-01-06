@@ -531,11 +531,12 @@ namespace nes { namespace detail {
             // *(lower + X)
             uint8_t indirectLower = 0;
             indirectLower = m_CpuBus.ReadByte(PC + 1);
-            // キャリーは無視 = オーバーフローしても気にしない
-            uint8_t indirectAddr = indirectLower + X;
+            // キャリーは無視 = オーバーフローしても気にしない(符号なし整数のオーバーフローは未定義でないことを確認済み)
+            uint8_t lowerAddr = indirectLower + X;
+            uint8_t upperAddr = lowerAddr + 1;
             // Indirect なので、FetchAddr 内で1回参照を剥がす
-            uint16_t lower = m_CpuBus.ReadByte(indirectAddr);
-            uint16_t upper = m_CpuBus.ReadByte(indirectAddr + 1);
+            uint16_t lower = m_CpuBus.ReadByte(lowerAddr);
+            uint16_t upper = m_CpuBus.ReadByte(upperAddr);
 
             uint16_t addr = lower | (upper << 8);
 
@@ -545,10 +546,11 @@ namespace nes { namespace detail {
         {
             // *(lower) + Y
             // キャリーは無視 = オーバーフローしても気にしない
-            uint8_t indirectAddr = m_CpuBus.ReadByte(PC + 1);
+            uint8_t lowerAddr = m_CpuBus.ReadByte(PC + 1);
+            uint8_t upperAddr = lowerAddr + 1;
             // Indirect なので、FetchAddr 内で1回参照を剥がす
-            uint16_t lower = m_CpuBus.ReadByte(indirectAddr);
-            uint16_t upper = m_CpuBus.ReadByte(indirectAddr + 1);
+            uint16_t lower = m_CpuBus.ReadByte(lowerAddr);
+            uint16_t upper = m_CpuBus.ReadByte(upperAddr);
 
             uint16_t addr = lower | (upper << 8);
             uint16_t beforeAddr = addr;

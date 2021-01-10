@@ -531,7 +531,7 @@ namespace nes { namespace detail {
 
             *pOutAddr = addr;
             // ページクロスで +1 クロック、Relative はブランチ命令で使われるが、ブランチ成立時にはさらに +1 されることに注意する
-            if ((PC & 0xFF00) != (addr & 0xFF00))
+            if ((signedPC & 0xFF00) != (addr & 0xFF00))
             {
                 *pOutAdditionalCyc = 1;
             }
@@ -773,7 +773,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BCS:
@@ -790,7 +791,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BEQ:
@@ -807,7 +809,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BIT:
@@ -842,7 +845,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BNE:
@@ -859,7 +863,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BPL:
@@ -876,7 +881,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BRK:
@@ -899,7 +905,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BVS:
@@ -916,7 +923,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::CLC:

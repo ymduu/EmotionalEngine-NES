@@ -16,4 +16,7 @@ namespace nes {
 	const uint16_t CASSETTE_BASE = 0x4020;
 	const uint16_t CASSETTE_PRG_ROM_BASE = 0x8000;
 
+	// masks
+	const uint8_t B_FLAG_MASK = 0b00110000;
+
 }

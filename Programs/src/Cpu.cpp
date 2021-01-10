@@ -5,6 +5,16 @@
 #include "constants.h"
 #include "Cpu.h"
 
+namespace {
+    // M, N を 8bit符号付き整数、 C をキャリーフラグとしたとき、N + M + C がオーバーフローするか？
+    // 符号付き整数の加減算オーバーフロー判定だが、引数は uint8_tであることに注意する(符号付き整数のオーバーフローは未定義)
+    bool isSignedOverFlowed(uint8_t N, uint8_t M, bool C)
+    {
+        uint8_t res = N + M + C;
+        return ((M ^ res) & (N ^ res) & 0x80) == 0x80;
+    }
+}
+
 namespace nes { namespace detail {
 	Instruction ByteToInstruction(uint8_t byte)
 	{
@@ -521,7 +531,7 @@ namespace nes { namespace detail {
 
             *pOutAddr = addr;
             // ページクロスで +1 クロック、Relative はブランチ命令で使われるが、ブランチ成立時にはさらに +1 されることに注意する
-            if ((PC & 0xFF00) != (addr & 0xFF00))
+            if ((signedPC & 0xFF00) != (addr & 0xFF00))
             {
                 *pOutAdditionalCyc = 1;
             }
@@ -531,11 +541,12 @@ namespace nes { namespace detail {
             // *(lower + X)
             uint8_t indirectLower = 0;
             indirectLower = m_CpuBus.ReadByte(PC + 1);
-            // キャリーは無視 = オーバーフローしても気にしない
-            uint8_t indirectAddr = indirectLower + X;
+            // キャリーは無視 = オーバーフローしても気にしない(符号なし整数のオーバーフローは未定義でないことを確認済み)
+            uint8_t lowerAddr = indirectLower + X;
+            uint8_t upperAddr = lowerAddr + 1;
             // Indirect なので、FetchAddr 内で1回参照を剥がす
-            uint16_t lower = m_CpuBus.ReadByte(indirectAddr);
-            uint16_t upper = m_CpuBus.ReadByte(indirectAddr + 1);
+            uint16_t lower = m_CpuBus.ReadByte(lowerAddr);
+            uint16_t upper = m_CpuBus.ReadByte(upperAddr);
 
             uint16_t addr = lower | (upper << 8);
 
@@ -545,10 +556,11 @@ namespace nes { namespace detail {
         {
             // *(lower) + Y
             // キャリーは無視 = オーバーフローしても気にしない
-            uint8_t indirectAddr = m_CpuBus.ReadByte(PC + 1);
+            uint8_t lowerAddr = m_CpuBus.ReadByte(PC + 1);
+            uint8_t upperAddr = lowerAddr + 1;
             // Indirect なので、FetchAddr 内で1回参照を剥がす
-            uint16_t lower = m_CpuBus.ReadByte(indirectAddr);
-            uint16_t upper = m_CpuBus.ReadByte(indirectAddr + 1);
+            uint16_t lower = m_CpuBus.ReadByte(lowerAddr);
+            uint16_t upper = m_CpuBus.ReadByte(upperAddr);
 
             uint16_t addr = lower | (upper << 8);
             uint16_t beforeAddr = addr;
@@ -572,10 +584,13 @@ namespace nes { namespace detail {
             indirectLower = m_CpuBus.ReadByte(PC + 1);
             indirectUpper = m_CpuBus.ReadByte(PC + 2);
 
+            // インクリメントにおいて下位バイトからのキャリーを無視するために、下位バイトに加算してからキャストする(ほんまか？？？？？)
+            // 符号なし整数の加算のオーバーフロー時の挙動を期待しているので、未定義かも(TODO: 調べる)
+            uint8_t indirectLower2 = indirectLower + 1;
+
             // Indirect なので、FetchAddr 内で1回参照を剥がす
             uint16_t addrLower = m_CpuBus.ReadByte(static_cast<uint16_t>(indirectLower) | (static_cast<uint16_t>(indirectUpper) << 8));
-            // インクリメントにおいて下位バイトからのキャリーを無視するために、下位バイトに加算してからキャストする(ほんまか？？？？？)
-            uint16_t addrUpper = m_CpuBus.ReadByte(static_cast<uint16_t>(indirectLower + 1) | (static_cast<uint16_t>(indirectUpper) << 8));
+            uint16_t addrUpper = m_CpuBus.ReadByte(static_cast<uint16_t>(indirectLower2) | (static_cast<uint16_t>(indirectUpper) << 8));
 
             uint16_t addr = addrLower | (addrUpper << 8);
             *pOutAddr = addr;
@@ -687,7 +702,7 @@ namespace nes { namespace detail {
             SetZeroFlag(res == 0);
             SetNegativeFlag((res & 0x80) == 0x80);
             // http://forums.nesdev.com/viewtopic.php?t=6331
-            SetOverflowFlag(((A ^ res) & (operand ^ res) & 0x80) == 0x80);
+            SetOverflowFlag(isSignedOverFlowed(A, operand, GetCarryFlag()));
 
             A = res;
             // PC 進める
@@ -758,7 +773,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BCS:
@@ -775,7 +791,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BEQ:
@@ -792,7 +809,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BIT:
@@ -827,7 +845,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BNE:
@@ -844,7 +863,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BPL:
@@ -861,7 +881,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BRK:
@@ -884,7 +905,8 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::BVS:
@@ -901,27 +923,32 @@ namespace nes { namespace detail {
             else
             {
                 PC += inst.m_Bytes;
-                return inst.m_Cycles + additionalCyc;
+                // 分岐しないときは additionalCyc 足さない
+                return inst.m_Cycles;
             }
         }
         case Opcode::CLC:
         {
             SetCarryFlag(false);
+            PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
         case Opcode::CLD:
         {
             SetDecimalFlag(false);
+            PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
         case Opcode::CLI:
         {
             SetInterruptFlag(false);
+            PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
         case Opcode::CLV:
         {
             SetOverflowFlag(false);
+            PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
         case Opcode::CMP:
@@ -1178,9 +1205,12 @@ namespace nes { namespace detail {
         {
             uint8_t arg;
             uint8_t additionalCyc;
-            uint16_t addr;
+            uint16_t addr = 0;;
 
-            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            if (inst.m_AddressingMode != AddressingMode::Accumulator)
+            {
+                FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            }
             FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
 
             uint8_t res = arg >> 1;
@@ -1237,7 +1267,8 @@ namespace nes { namespace detail {
         }
         case Opcode::PHP:
         {
-            PushStack(P);
+            // http://wiki.nesdev.com/w/index.php/Status_flags: P の 4bit 目と 5bit 目を立ててスタックにプッシュ
+            PushStack(P | B_FLAG_MASK);
             PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
@@ -1259,7 +1290,8 @@ namespace nes { namespace detail {
         {
             uint8_t res = PopStack();
 
-            P = res;
+            // http://wiki.nesdev.com/w/index.php/Status_flags: Pの 4bit 目と 5bit 目は更新しない
+            P = (res & ~B_FLAG_MASK) | (P & B_FLAG_MASK);
 
             PC += inst.m_Bytes;
             return inst.m_Cycles;
@@ -1268,9 +1300,12 @@ namespace nes { namespace detail {
         {
             uint8_t arg;
             uint8_t additionalCyc;
-            uint16_t addr;
+            uint16_t addr = 0;
 
-            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            if (inst.m_AddressingMode != AddressingMode::Accumulator)
+            {
+                FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            }
             FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
 
             uint8_t res = arg << 1;
@@ -1300,9 +1335,12 @@ namespace nes { namespace detail {
         {
             uint8_t arg;
             uint8_t additionalCyc;
-            uint16_t addr;
+            uint16_t addr = 0;;
 
-            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            if (inst.m_AddressingMode != AddressingMode::Accumulator)
+            {
+                FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            }
             FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
 
             uint8_t res = arg >> 1;
@@ -1330,7 +1368,11 @@ namespace nes { namespace detail {
         }
         case Opcode::RTI:
         {
-            P = PopStack();
+            uint8_t res = PopStack();
+
+            // http://wiki.nesdev.com/w/index.php/Status_flags: Pの 4bit 目と 5bit 目は更新しない
+            P = (res & ~B_FLAG_MASK) | (P & B_FLAG_MASK);
+
             uint16_t lower = PopStack();
             uint16_t upper = PopStack();
             PC = lower | (upper << 8);
@@ -1343,6 +1385,8 @@ namespace nes { namespace detail {
             uint16_t upper = PopStack();
             PC = lower | (upper << 8);
 
+            // JSR でスタックにプッシュされるアドレスは JSR の最後のアドレスで、RTS 側でインクリメントされる
+            PC++;
             return inst.m_Cycles;
         }
         case Opcode::SBC:
@@ -1351,12 +1395,19 @@ namespace nes { namespace detail {
             uint8_t additionalCyc;
             FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
 
-            uint16_t calc = static_cast<uint16_t>(A) - arg - !GetCarryFlag();
+            // 足し算に変換
+            // http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html#:~:text=The%20definition%20of%20the%206502,fit%20into%20a%20signed%20byte.&text=For%20each%20set%20of%20input,and%20the%20overflow%20bit%20V.
+            // A - arg - borrow == A + ~arg + carry
+
+            arg = ~arg;
+
+            uint16_t calc = static_cast<int16_t>(A) + arg + GetCarryFlag();
             uint8_t res = static_cast<uint8_t>(calc);
 
-            bool overflowFlag = (((A ^ calc) & 0x80) != 0 && ((A ^ arg) & 0x80) != 0);
-            bool carryFlag = calc >= 0;
-            bool negativeFlag = (calc & 0x80) == 0x80;
+            // 足し算に変換 したので、足し算と同じようにフラグ計算可能
+            bool overflowFlag = isSignedOverFlowed(A, arg, GetCarryFlag());
+            bool carryFlag = calc > 0xff;
+            bool negativeFlag = (res & 0x80) == 0x80;
             bool zeroFlag = res == 0;
 
             SetOverflowFlag(overflowFlag);

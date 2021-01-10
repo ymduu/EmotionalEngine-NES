@@ -88,6 +88,7 @@ namespace test {
 			}
 		}
 		printf("                                 ");
-		printf("A:%02hhX X:%02hhX Y:%02hhX P:%2hhX SP:%02hhX\n", info->A, info->X, info->Y, info->P, info->SP);
+		// クロックサイクル 出す版
+		printf("A:%02hhX X:%02hhX Y:%02hhX P:%2hhX SP:%02hhX CYC:%llu\n", info->A, info->X, info->Y, info->P, info->SP, cycles);
 	}
 }

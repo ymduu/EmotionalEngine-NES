@@ -5,6 +5,16 @@
 #include "constants.h"
 #include "Cpu.h"
 
+namespace {
+    // M, N を 8bit符号付き整数、 C をキャリーフラグとしたとき、N + M + C がオーバーフローするか？
+    // 符号付き整数の加減算オーバーフロー判定だが、引数は uint8_tであることに注意する(符号付き整数のオーバーフローは未定義)
+    bool isSignedOverFlowed(uint8_t N, uint8_t M, bool C)
+    {
+        uint8_t res = N + M + C;
+        return ((M ^ res) & (N ^ res) & 0x80) == 0x80;
+    }
+}
+
 namespace nes { namespace detail {
 	Instruction ByteToInstruction(uint8_t byte)
 	{
@@ -692,7 +702,7 @@ namespace nes { namespace detail {
             SetZeroFlag(res == 0);
             SetNegativeFlag((res & 0x80) == 0x80);
             // http://forums.nesdev.com/viewtopic.php?t=6331
-            SetOverflowFlag(((A ^ res) & (operand ^ res) & 0x80) == 0x80);
+            SetOverflowFlag(isSignedOverFlowed(A, operand, GetCarryFlag()));
 
             A = res;
             // PC 進める
@@ -1377,12 +1387,19 @@ namespace nes { namespace detail {
             uint8_t additionalCyc;
             FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
 
-            uint16_t calc = static_cast<uint16_t>(A) - arg - !GetCarryFlag();
+            // 足し算に変換
+            // http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html#:~:text=The%20definition%20of%20the%206502,fit%20into%20a%20signed%20byte.&text=For%20each%20set%20of%20input,and%20the%20overflow%20bit%20V.
+            // A - arg - borrow == A + ~arg + carry
+
+            arg = ~arg;
+
+            uint16_t calc = static_cast<int16_t>(A) + arg + GetCarryFlag();
             uint8_t res = static_cast<uint8_t>(calc);
 
-            bool overflowFlag = (((A ^ calc) & 0x80) != 0 && ((A ^ arg) & 0x80) != 0);
-            bool carryFlag = calc >= 0;
-            bool negativeFlag = (calc & 0x80) == 0x80;
+            // 足し算に変換 したので、足し算と同じようにフラグ計算可能
+            bool overflowFlag = isSignedOverFlowed(A, arg, GetCarryFlag());
+            bool carryFlag = calc > 0xff;
+            bool negativeFlag = (res & 0x80) == 0x80;
             bool zeroFlag = res == 0;
 
             SetOverflowFlag(overflowFlag);

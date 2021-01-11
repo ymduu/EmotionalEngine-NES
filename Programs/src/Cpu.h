@@ -61,6 +61,23 @@ namespace nes { namespace detail {
         TXA,
         TXS,
         TYA,
+        // unofficial
+        // https://wiki.nesdev.com/w/index.php/Programming_with_unofficial_opcodes
+        ALR,
+        ANC,
+        ARR,
+        AXS,
+        LAX,
+        SAX,
+        DCP,
+        ISC,
+        RLA,
+        RRA,
+        SLO,
+        SRE,
+        SKB,
+        IGN,
+        // unofficial ‚©‚ÂŠù‘¶‚Ì Opcode ‚ÍŠù‘¶‚Ì Opcode ‚ðŽg‚¤‚à‚Ì‚Æ‚µ‚Ü‚·
     };
     enum class AddressingMode {
         Implied,

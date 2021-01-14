@@ -13,6 +13,12 @@ namespace {
         uint8_t res = N + M + C;
         return ((M ^ res) & (N ^ res) & 0x80) == 0x80;
     }
+
+    // 8bit 符号つき整数における n の 2の補数表現を取得する
+    uint8_t GetTwosComplement(uint8_t n)
+    {
+        return ~n + 1;
+    }
 }
 
 namespace nes { namespace detail {
@@ -322,6 +328,180 @@ namespace nes { namespace detail {
             return Instruction(Opcode::TXS, AddressingMode::Implied, 1, 2);
         case 0x98:
             return Instruction(Opcode::TYA, AddressingMode::Implied, 1, 2);
+        // unofficial opcodes
+        case 0x4B:
+            return Instruction(Opcode::ALR, AddressingMode::Immediate, 2, 2);
+        case 0x0B:
+            return Instruction(Opcode::ANC, AddressingMode::Immediate, 2, 2);
+        case 0x6B:
+            return Instruction(Opcode::ARR, AddressingMode::Immediate, 2, 2);
+        case 0xCB:
+            return Instruction(Opcode::AXS, AddressingMode::Immediate, 2, 2);
+        case 0xA3:
+            return Instruction(Opcode::LAX, AddressingMode::IndirectX, 2, 6);
+        case 0xA7:
+            return Instruction(Opcode::LAX, AddressingMode::ZeroPage, 2, 3);
+        case 0xAF:
+            return Instruction(Opcode::LAX, AddressingMode::Absolute, 3, 4);
+        case 0xB3:
+            return Instruction(Opcode::LAX, AddressingMode::IndirectY, 2, 5);
+        case 0xB7:
+            return Instruction(Opcode::LAX, AddressingMode::ZeroPageY, 2, 4);
+        case 0xBF:
+            return Instruction(Opcode::LAX, AddressingMode::AbsoluteY, 3, 4);
+        case 0x83:
+            return Instruction(Opcode::SAX, AddressingMode::IndirectX, 2, 6);
+        case 0x87:
+            return Instruction(Opcode::SAX, AddressingMode::ZeroPage, 2, 3);
+        case 0x8F:
+            return Instruction(Opcode::SAX, AddressingMode::Absolute, 3, 4);
+        case 0x97:
+            return Instruction(Opcode::SAX, AddressingMode::ZeroPageY, 2, 4);
+        case 0xC3:
+            return Instruction(Opcode::DCP, AddressingMode::IndirectX, 2, 8);
+        case 0xC7:
+            return Instruction(Opcode::DCP, AddressingMode::ZeroPage, 2, 5);
+        case 0xCF:
+            return Instruction(Opcode::DCP, AddressingMode::Absolute, 3, 6);
+        case 0xD3:
+            return Instruction(Opcode::DCP, AddressingMode::IndirectY, 2, 8);
+        case 0xD7:
+            return Instruction(Opcode::DCP, AddressingMode::ZeroPageX, 2, 6);
+        case 0xDB:
+            return Instruction(Opcode::DCP, AddressingMode::AbsoluteY, 3, 7);
+        case 0xDF:
+            return Instruction(Opcode::DCP, AddressingMode::AbsoluteX, 3, 7);
+        case 0xE3:
+            return Instruction(Opcode::ISC, AddressingMode::IndirectX, 2, 8);
+        case 0xE7:
+            return Instruction(Opcode::ISC, AddressingMode::ZeroPage, 2, 5);
+        case 0xEF:
+            return Instruction(Opcode::ISC, AddressingMode::Absolute, 3, 6);
+        case 0xF3:
+            return Instruction(Opcode::ISC, AddressingMode::IndirectY, 2, 8);
+        case 0xF7:
+            return Instruction(Opcode::ISC, AddressingMode::ZeroPageX, 2, 6);
+        case 0xFB:
+            return Instruction(Opcode::ISC, AddressingMode::AbsoluteY, 3, 7);
+        case 0xFF:
+            return Instruction(Opcode::ISC, AddressingMode::AbsoluteX, 3, 7);
+        case 0x23:
+            return Instruction(Opcode::RLA, AddressingMode::IndirectX, 2, 8);
+        case 0x27:
+            return Instruction(Opcode::RLA, AddressingMode::ZeroPage, 2, 5);
+        case 0x2F:
+            return Instruction(Opcode::RLA, AddressingMode::Absolute, 3, 6);
+        case 0x33:
+            return Instruction(Opcode::RLA, AddressingMode::IndirectY, 2, 8);
+        case 0x37:
+            return Instruction(Opcode::RLA, AddressingMode::ZeroPageX, 2, 6);
+        case 0x3B:
+            return Instruction(Opcode::RLA, AddressingMode::AbsoluteY, 3, 7);
+        case 0x3F:
+            return Instruction(Opcode::RLA, AddressingMode::AbsoluteX, 3, 7);
+        case 0x63:
+            return Instruction(Opcode::RRA, AddressingMode::IndirectX, 2, 8);
+        case 0x67:
+            return Instruction(Opcode::RRA, AddressingMode::ZeroPage, 2, 5);
+        case 0x6F:
+            return Instruction(Opcode::RRA, AddressingMode::Absolute, 3, 6);
+        case 0x73:
+            return Instruction(Opcode::RRA, AddressingMode::IndirectY, 2, 8);
+        case 0x77:
+            return Instruction(Opcode::RRA, AddressingMode::ZeroPageX, 2, 6);
+        case 0x7B:
+            return Instruction(Opcode::RRA, AddressingMode::AbsoluteY, 3, 7);
+        case 0x7F:
+            return Instruction(Opcode::RRA, AddressingMode::AbsoluteX, 3, 7);
+        case 0x03:
+            return Instruction(Opcode::SLO, AddressingMode::IndirectX, 2, 8);
+        case 0x07:
+            return Instruction(Opcode::SLO, AddressingMode::ZeroPage, 2, 5);
+        case 0x0F:
+            return Instruction(Opcode::SLO, AddressingMode::Absolute, 3, 6);
+        case 0x13:
+            return Instruction(Opcode::SLO, AddressingMode::IndirectY, 2, 8);
+        case 0x17:
+            return Instruction(Opcode::SLO, AddressingMode::ZeroPageX, 2, 6);
+        case 0x1B:
+            return Instruction(Opcode::SLO, AddressingMode::AbsoluteY, 3, 7);
+        case 0x1F:
+            return Instruction(Opcode::SLO, AddressingMode::AbsoluteX, 3, 7);
+        case 0x43:
+            return Instruction(Opcode::SRE, AddressingMode::IndirectX, 2, 8);
+        case 0x47:
+            return Instruction(Opcode::SRE, AddressingMode::ZeroPage, 2, 5);
+        case 0x4F:
+            return Instruction(Opcode::SRE, AddressingMode::Absolute, 3, 6);
+        case 0x53:
+            return Instruction(Opcode::SRE, AddressingMode::IndirectY, 2, 8);
+        case 0x57:
+            return Instruction(Opcode::SRE, AddressingMode::ZeroPageX, 2, 6);
+        case 0x5B:
+            return Instruction(Opcode::SRE, AddressingMode::AbsoluteY, 3, 7);
+        case 0x5F:
+            return Instruction(Opcode::SRE, AddressingMode::AbsoluteX, 3, 7);
+        // Duplicated Instructions
+        // ADC は SBC で代用されることに注意する
+        case 0xEB:
+            return Instruction(Opcode::SBC, AddressingMode::Immediate, 2, 2);
+        // NOPs
+        case 0x1A:
+            return Instruction(Opcode::NOP, AddressingMode::Implied, 1, 2);
+        case 0x3A:
+            return Instruction(Opcode::NOP, AddressingMode::Implied, 1, 2);
+        case 0x5A:
+            return Instruction(Opcode::NOP, AddressingMode::Implied, 1, 2);
+        case 0x7A:
+            return Instruction(Opcode::NOP, AddressingMode::Implied, 1, 2);
+        case 0xDA:
+            return Instruction(Opcode::NOP, AddressingMode::Implied, 1, 2);
+        case 0xFA:
+            return Instruction(Opcode::NOP, AddressingMode::Implied, 1, 2);
+        case 0x80:
+            return Instruction(Opcode::SKB, AddressingMode::Immediate, 2, 2);
+        case 0x82:
+            return Instruction(Opcode::SKB, AddressingMode::Immediate, 2, 2);
+        case 0x89:
+            return Instruction(Opcode::SKB, AddressingMode::Immediate, 2, 2);
+        case 0xC2:
+            return Instruction(Opcode::SKB, AddressingMode::Immediate, 2, 2);
+        case 0xE2:
+            return Instruction(Opcode::SKB, AddressingMode::Immediate, 2, 2);
+        // IGN もページクロスで +1 クロック？
+        case 0x0C:
+            return Instruction(Opcode::IGN, AddressingMode::Absolute, 3, 4);
+        case 0x1C:
+            return Instruction(Opcode::IGN, AddressingMode::AbsoluteX, 3, 4);
+        case 0x3C:
+            return Instruction(Opcode::IGN, AddressingMode::AbsoluteX, 3, 4);
+        case 0x5C:
+            return Instruction(Opcode::IGN, AddressingMode::AbsoluteX, 3, 4);
+        case 0x7C:
+            return Instruction(Opcode::IGN, AddressingMode::AbsoluteX, 3, 4);
+        case 0xDC:
+            return Instruction(Opcode::IGN, AddressingMode::AbsoluteX, 3, 4);
+        case 0xFC:
+            return Instruction(Opcode::IGN, AddressingMode::AbsoluteX, 3, 4);
+        case 0x04:
+            return Instruction(Opcode::IGN, AddressingMode::ZeroPage, 2, 3);
+        case 0x44:
+            return Instruction(Opcode::IGN, AddressingMode::ZeroPage, 2, 3);
+        case 0x64:
+            return Instruction(Opcode::IGN, AddressingMode::ZeroPage, 2, 3);
+        case 0x14:
+            return Instruction(Opcode::IGN, AddressingMode::ZeroPageX, 2, 4);
+        case 0x34:
+            return Instruction(Opcode::IGN, AddressingMode::ZeroPageX, 2, 4);
+        case 0x54:
+            return Instruction(Opcode::IGN, AddressingMode::ZeroPageX, 2, 4);
+        case 0x74:
+            return Instruction(Opcode::IGN, AddressingMode::ZeroPageX, 2, 4);
+        case 0xD4:
+            return Instruction(Opcode::IGN, AddressingMode::ZeroPageX, 2, 4);
+        case 0xF4:
+            return Instruction(Opcode::IGN, AddressingMode::ZeroPageX, 2, 4);
+        // CLD, CLV, SED は必要なら実装する
 
 		default:
 			abort();
@@ -1542,7 +1722,369 @@ namespace nes { namespace detail {
             PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
+        case Opcode::ALR:
+        {
+            // AND + LSR
+            uint8_t arg;
+            uint8_t additionalCyc;
 
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t tmp = A & arg;
+
+            uint8_t res = tmp >> 1;
+
+            bool carryFlag = (tmp & 0x01) == 0x01;
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetCarryFlag(carryFlag);
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            A = res;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::ANC:
+        {
+            // AND して、 N を C にコピー(符号拡張に使えるそうな)
+            uint8_t arg;
+            uint8_t additionalCyc;
+
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t res = A & arg;
+
+            bool carryFlag = GetNegativeFlag();
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetCarryFlag(carryFlag);
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            A = res;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::ARR:
+        {
+            // AND して、 RORする、 C は bit6、 V は bit6 ^ bit5
+            uint8_t arg;
+            uint8_t additionalCyc;
+
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t tmp = A & arg;
+            uint8_t res = tmp >> 1;
+
+            bool carryFlag = (res & 0b01000000) == 0b01000000;
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            // carryflag には bit6 が入っているので使う
+            bool bit6 = carryFlag;
+            bool bit5 = (res & 0b00100000) == 0b00100000;
+            bool overflowFlag = bit6 ^ bit5;
+
+            SetCarryFlag(carryFlag);
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+            SetOverflowFlag(overflowFlag);
+
+            A = res;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::AXS:
+        {
+            // X = A & X - imm、without borrow であることに注意する(解釈間違ってるかも？)
+            uint8_t arg;
+            uint8_t additionalCyc;
+
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t tmp = A & X;
+
+            // 2の補数表現での加算に直す
+            arg = GetTwosComplement(arg);
+            uint16_t calc = tmp + arg;
+            uint8_t res = static_cast<uint8_t>(calc);
+
+            bool carryFlag = calc > 0xFF;
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetCarryFlag(carryFlag);
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            X = res;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::LAX:
+        {
+            // LDA -> TAX(X = A = memory)
+            uint8_t arg;
+            uint8_t additionalCyc;
+
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            bool zeroFlag = arg == 0;
+            bool negativeFlag = (arg & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            X = arg;
+            A = arg;
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
+        case Opcode::SAX:
+        {
+            uint16_t addr = 0;
+            uint8_t dummy = 0;
+            FetchAddr(inst.m_AddressingMode, &addr, &dummy);
+
+            // (memory = A & X)
+            uint8_t res = A & X;
+            m_CpuBus.WriteByte(addr, res);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::DCP:
+        {
+            // DEC + CMP
+
+            uint8_t arg;
+            uint8_t additionalCyc;
+            uint16_t addr;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            // DEC
+            uint8_t res = arg - 1;
+
+            // CMP
+            uint8_t resCmp = A - res;
+
+            bool zeroFlag = resCmp == 0;
+            bool negativeFlag = (resCmp & 0x80) == 0x80;
+            bool carryFlag = A >= res;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+            SetCarryFlag(carryFlag);
+            m_CpuBus.WriteByte(addr, res);
+
+            PC += inst.m_Bytes;
+            // DCP は additionalCyc を足さない(多分……)
+            return inst.m_Cycles;
+        }
+        case Opcode::ISC:
+        {
+            // INC + SBC
+
+            uint8_t arg;
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            // INC
+            m_CpuBus.WriteByte(addr, ++arg);
+
+            // 足し算に変換(SBC 同様)
+            // http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html#:~:text=The%20definition%20of%20the%206502,fit%20into%20a%20signed%20byte.&text=For%20each%20set%20of%20input,and%20the%20overflow%20bit%20V.
+            // A - arg - borrow == A + ~arg + carry
+
+            arg = ~arg;
+
+            uint16_t calc = static_cast<int16_t>(A) + arg + GetCarryFlag();
+            uint8_t res = static_cast<uint8_t>(calc);
+
+            // 足し算に変換 したので、足し算と同じようにフラグ計算可能
+            bool overflowFlag = isSignedOverFlowed(A, arg, GetCarryFlag());
+            bool carryFlag = calc > 0xff;
+            bool negativeFlag = (res & 0x80) == 0x80;
+            bool zeroFlag = res == 0;
+
+            SetOverflowFlag(overflowFlag);
+            SetCarryFlag(carryFlag);
+            SetNegativeFlag(negativeFlag);
+            SetZeroFlag(zeroFlag);
+
+            A = res;
+            PC += inst.m_Bytes;
+            // ISC は additionalCyc を足さない(多分……)
+            return inst.m_Cycles;
+        }
+        case Opcode::RLA:
+        {
+            // ROL + AND
+            uint8_t arg;
+            uint8_t additionalCyc;
+            uint16_t addr = 0;
+
+            // RLA にアドレッシングモード Accumulator はないので、分岐の必要はない
+            assert(inst.m_AddressingMode != AddressingMode::Accumulator);
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            // ROL
+            uint8_t res = arg << 1;
+            res |= GetCarryFlag() ? 1 : 0;
+
+            m_CpuBus.WriteByte(addr, res);
+
+            bool carryFlag = (arg & 0x80) == 0x80;
+
+            // AND
+            res &= A;
+
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetCarryFlag(carryFlag);
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            A = res;
+
+            PC += inst.m_Bytes;
+            // RLA は additionalCyc を足さない(多分……)
+            return inst.m_Cycles;
+        }
+        case Opcode::RRA:
+        {
+            // ROR + ADC
+            uint8_t arg;
+            uint8_t additionalCyc;
+            uint16_t addr = 0;
+
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            // ROR
+            uint8_t res = arg >> 1;
+            res |= GetCarryFlag() ? 0x80 : 0;
+
+            bool carryFlag = (arg & 1) == 1;
+            SetCarryFlag(carryFlag);
+            m_CpuBus.WriteByte(addr, res);
+
+            // ADC
+            uint16_t calc = static_cast<uint16_t>(A) + res + GetCarryFlag();
+            bool overflowFlag = isSignedOverFlowed(A, res, GetCarryFlag());
+
+            res = static_cast<uint8_t>(calc);
+
+            SetCarryFlag(calc > 0xff);
+            SetZeroFlag(res == 0);
+            SetNegativeFlag((res & 0x80) == 0x80);
+            // http://forums.nesdev.com/viewtopic.php?t=6331
+            SetOverflowFlag(overflowFlag);
+
+            A = res;
+
+            PC += inst.m_Bytes;
+            // RRA は additionalCyc を足さない(多分……)
+            return inst.m_Cycles;
+        }
+        case Opcode::SLO:
+        {
+            // ASL + ORA
+
+            uint8_t arg;
+            uint16_t addr;
+            uint8_t additionalCyc;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            // ASL
+            uint8_t res = arg << 1;
+
+            // MSB が立ってる時に左シフトしたら carry になる
+            bool carryFlag = (arg & 0x80) == 0x80;
+            SetCarryFlag(carryFlag);
+
+            m_CpuBus.WriteByte(addr, res);
+
+            // ORA
+            res |= A;
+
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            A = res;
+
+            PC += inst.m_Bytes;
+            // SLO は additionalCyc を足さない(多分……)
+            return inst.m_Cycles;
+        }
+        case Opcode::SRE:
+        {
+            // LSR + EOR
+            uint8_t arg;
+            uint8_t additionalCyc;
+            uint16_t addr = 0;
+            FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            uint8_t res = arg >> 1;
+
+            bool carryFlag = (arg & 1) == 1;
+            SetCarryFlag(carryFlag);
+
+            m_CpuBus.WriteByte(addr, res);
+
+            // EOR
+            res ^= A;
+
+            bool zeroFlag = res == 0;
+            bool negativeFlag = (res & 0x80) == 0x80;
+
+            SetZeroFlag(zeroFlag);
+            SetNegativeFlag(negativeFlag);
+
+            A = res;
+
+            PC += inst.m_Bytes;
+            // SRE は additionalCyc を足さない(多分……)
+            return inst.m_Cycles;
+        }
+        case Opcode::SKB:
+        {
+            // 副作用を気にしたくなった場合のためにフェッチだけする
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles;
+        }
+        case Opcode::IGN:
+        {
+            // 副作用を気にしたくなった場合のためにフェッチだけする
+            uint8_t arg;
+            uint8_t additionalCyc;
+            FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
+
+            PC += inst.m_Bytes;
+            return inst.m_Cycles + additionalCyc;
+        }
 
         default:
             // unexpected default

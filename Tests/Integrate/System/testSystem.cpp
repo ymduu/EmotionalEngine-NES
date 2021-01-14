@@ -114,7 +114,8 @@ void TestSystem_NesTest()
     uint64_t clk = 7;
     uint64_t inst = 1;
 
-    for (int i = 0; i < 5003; i++) {
+    // official –½—ß: 5003 ‚Ü‚ÅA unofficial –½—ß: 8991‚Ü‚Å
+    for (int i = 0; i < 8991; i++) {
         auto info = cpu.GetCpuInfoForDebug();
         test::LogCpuStatusNesTestStyle(&info, clk, inst);
         clk += cpu.Run();

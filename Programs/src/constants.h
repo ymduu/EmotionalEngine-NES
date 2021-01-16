@@ -10,11 +10,21 @@ namespace nes {
 	const size_t PPU_REG_SIZE = 0x8;
 	const size_t APU_IO_REG_SIZE = 0x20;
 
+	// PPU Memory Map
+	// TORIAEZU: ミラーリングは考慮しないで4画面分とっておく
+	const size_t NAMETABLE_SIZE = 0x1000;
+	const size_t PALETTE_SIZE = 0x20;
+
 	// Base Addr
 	const uint16_t PPU_REG_BASE = 0x2000;
 	const uint16_t APU_IO_REG_BASE = 0x4000;
 	const uint16_t CASSETTE_BASE = 0x4020;
 	const uint16_t CASSETTE_PRG_ROM_BASE = 0x8000;
+
+	// PPU Base Addr
+	const uint16_t NAMETABLE_BASE = 0x2000;
+	const uint16_t PALETTE_BASE = 0x3F00;
+
 
 	// masks
 	const uint8_t B_FLAG_MASK = 0b00110000;

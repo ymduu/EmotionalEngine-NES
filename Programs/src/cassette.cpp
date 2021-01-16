@@ -57,6 +57,7 @@ namespace nes { namespace detail {
 	void Cassette::ReadChrRom(uint8_t* pBuffer, int offset, size_t size)
 	{
 		assert(m_Initialized);
+		// 必要なら mirror すること(必要なら assert 引っかかるはず)
 		assert(offset + size <= m_ChrRomSize);
 		memcpy(pBuffer, m_ChrRom + offset, size);
 	}

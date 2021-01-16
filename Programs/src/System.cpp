@@ -70,4 +70,56 @@ namespace nes { namespace detail {
 			m_pSystem->m_Cassette.WritePrgRom(&data, offset, 1);
 		}
 	}
+
+	uint8_t PpuBus::ReadByte(uint16_t addr)
+	{
+		// CHR ROM からの読み出し
+		if (addr < NAMETABLE_BASE)
+		{
+			uint8_t ret = 0;
+			m_pSystem->m_Cassette.ReadChrRom(&ret, addr, 1);
+			return ret;
+		}
+		else if (addr < PALETTE_BASE)
+		{
+			// nametable 読み出し
+			size_t offset = addr - NAMETABLE_BASE;
+			// mirror
+			size_t idx = offset % NAMETABLE_SIZE;
+			return m_pSystem->m_PpuSystem.m_NameTable[offset];
+		}
+		else
+		{
+			// palette 読み出し
+			size_t offset = addr - PALETTE_BASE;
+			size_t idx = offset % PALETTE_SIZE;
+
+			return m_pSystem->m_PpuSystem.m_Pallettes[offset];
+		}
+	}
+
+	void PpuBus::WriteByte(uint16_t addr, uint8_t data)
+	{
+		// CHR ROM 書き込み(？)
+		if (addr < NAMETABLE_BASE)
+		{
+			m_pSystem->m_Cassette.WriteChrRom(&data, addr, 1);
+		}
+		else if (addr < PALETTE_BASE)
+		{
+			// nametable 書き込み
+			size_t offset = addr - NAMETABLE_BASE;
+			// mirror
+			size_t idx = offset % NAMETABLE_SIZE;
+			m_pSystem->m_PpuSystem.m_NameTable[offset] = data;
+		}
+		else
+		{
+			// palette 書き込み
+			size_t offset = addr - PALETTE_BASE;
+			size_t idx = offset % PALETTE_SIZE;
+
+			m_pSystem->m_PpuSystem.m_Pallettes[offset] = data;
+		}
+	}
 }}

@@ -28,6 +28,9 @@ namespace nes { namespace detail {
 	public:
 		Cassette()
 			:m_Initialized(false)
+			,m_PrgRom{}
+			,m_ChrRom{}
+			,m_Header{}
 			,m_PrgRomSize(0)
 			,m_ChrRomSize(0)
 		{}

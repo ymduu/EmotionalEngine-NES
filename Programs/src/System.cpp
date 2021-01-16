@@ -86,7 +86,7 @@ namespace nes { namespace detail {
 			size_t offset = addr - NAMETABLE_BASE;
 			// mirror
 			size_t idx = offset % NAMETABLE_SIZE;
-			return m_pSystem->m_PpuSystem.m_NameTable[offset];
+			return m_pSystem->m_PpuSystem.m_NameTable[idx];
 		}
 		else
 		{
@@ -94,7 +94,28 @@ namespace nes { namespace detail {
 			size_t offset = addr - PALETTE_BASE;
 			size_t idx = offset % PALETTE_SIZE;
 
-			return m_pSystem->m_PpuSystem.m_Pallettes[offset];
+			return m_pSystem->m_PpuSystem.m_Pallettes[idx];
+		}
+	}
+
+	uint8_t PpuBus::ReadByte(uint16_t addr, bool isPpuBuffering)
+	{
+		if (!isPpuBuffering)
+		{
+			return ReadByte(addr);
+		}
+
+		if (addr >= PALETTE_BASE)
+		{
+			// パレット領域の代わりに nametable 読み出し
+			size_t offset = addr - NAMETABLE_BASE;
+			// mirror
+			size_t idx = offset % NAMETABLE_SIZE;
+			return m_pSystem->m_PpuSystem.m_NameTable[idx];
+		}
+		else
+		{
+			return ReadByte(addr);
 		}
 	}
 
@@ -111,7 +132,7 @@ namespace nes { namespace detail {
 			size_t offset = addr - NAMETABLE_BASE;
 			// mirror
 			size_t idx = offset % NAMETABLE_SIZE;
-			m_pSystem->m_PpuSystem.m_NameTable[offset] = data;
+			m_pSystem->m_PpuSystem.m_NameTable[idx] = data;
 		}
 		else
 		{
@@ -119,7 +140,7 @@ namespace nes { namespace detail {
 			size_t offset = addr - PALETTE_BASE;
 			size_t idx = offset % PALETTE_SIZE;
 
-			m_pSystem->m_PpuSystem.m_Pallettes[offset] = data;
+			m_pSystem->m_PpuSystem.m_Pallettes[idx] = data;
 		}
 	}
 }}

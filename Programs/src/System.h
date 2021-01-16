@@ -75,6 +75,8 @@ namespace nes { namespace detail {
 			,m_pPpuSystem(pPpuSystem)
 		{}
 		uint8_t ReadByte(uint16_t addr);
+		// パレットテーブルの "下"にある nametableのミラーが PPU の内部バッファに読まれるのでそれに対応する
+		uint8_t ReadByte(uint16_t addr, bool isPpuBuffering);
 		void WriteByte(uint16_t addr, uint8_t data);
 	private:
 		System* m_pSystem;

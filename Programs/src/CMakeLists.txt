@@ -5,9 +5,11 @@ add_library(EmotionalNES
   cassette.h
   constants.h
   Cpu.h
+  Ppu.h
   System.h
   cassette.cpp
   Cpu.cpp
+  Ppu.cpp
   System.cpp
   )
 

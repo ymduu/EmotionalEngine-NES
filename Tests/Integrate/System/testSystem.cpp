@@ -33,7 +33,7 @@ void ReadNesTestNes(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
 // 各アドレスを読み書きする、とりあえず WRAM とカセット だけ
 void TestSystem_ReadWrite()
 {
-    std::cout << "====" << __FUNCTION__ << "====\n";
+    std::cout << "==== " << __FUNCTION__ << " ====\n";
     std::shared_ptr<uint8_t[]> rom;
     size_t size;
     ReadHelloWorldNes(&rom, &size);
@@ -74,7 +74,7 @@ void TestSystem_ReadWrite()
 // Hello World
 void TestSystem_HelloWorld()
 {
-    std::cout << "====" << __FUNCTION__ << "====\n";
+    std::cout << "==== " << __FUNCTION__ << " ====\n";
     std::shared_ptr<uint8_t[]> rom;
     size_t size;
     ReadHelloWorldNes(&rom, &size);
@@ -87,11 +87,22 @@ void TestSystem_HelloWorld()
     uint64_t inst = 1;
 
     for (int i = 0; i < 175; i++) {
-        auto info = cpu.GetCpuInfoForDebug();
-        test::LogCpuStatusFceuxStyle(&info, clk, inst);
+        // ログ出したい場合、アンコメント
+        //auto info = cpu.GetCpuInfoForDebug();
+        //test::LogCpuStatusFceuxStyle(&info, clk, inst);
         clk += cpu.Run();
         inst++;
     }
+
+    auto finalInfo = cpu.GetCpuInfoForDebug();
+
+    assert(finalInfo.A == 0x1E);
+    assert(finalInfo.X == 0x0D);
+    assert(finalInfo.Y == 0x00);
+    assert(finalInfo.P == 0x24);
+    assert(finalInfo.SP == 0x00FF);
+    assert(finalInfo.PC == 0x804E);
+    assert(clk == 525);
 
     std::cout << "====" << __FUNCTION__ << " END ====\n";
 }
@@ -99,7 +110,7 @@ void TestSystem_HelloWorld()
 // nestest.nes
 void TestSystem_NesTest()
 {
-    //std::cout << "====" << __FUNCTION__ << "====\n";
+    std::cout << "==== " << __FUNCTION__ << " ====\n";
     std::shared_ptr<uint8_t[]> rom;
     size_t size;
     ReadNesTestNes(&rom, &size);
@@ -116,19 +127,31 @@ void TestSystem_NesTest()
 
     // official 命令: 5003 まで、 unofficial 命令: 8991まで
     for (int i = 0; i < 8991; i++) {
-        auto info = cpu.GetCpuInfoForDebug();
-        test::LogCpuStatusNesTestStyle(&info, clk, inst);
+        // ログ出したい時はコメントアウトを外す
+        //auto info = cpu.GetCpuInfoForDebug();
+        //test::LogCpuStatusNesTestStyle(&info, clk, inst);
         clk += cpu.Run();
         inst++;
     }
 
-    std::cout << "====" << __FUNCTION__ << " END ====\n";
+    // TORIAEZU: レジスタ状態とサイクル数だけあってればよしとする
+    auto finalInfo = cpu.GetCpuInfoForDebug();
+
+    assert(finalInfo.A == 0x00);
+    assert(finalInfo.X == 0xFF);
+    assert(finalInfo.Y == 0x15);
+    assert(finalInfo.P == 0x27);
+    assert(finalInfo.SP == 0x00FF);
+    assert(finalInfo.PC == 1);
+    assert(clk == 26560);
+
+    std::cout << "==== " << __FUNCTION__ << " OK ====\n";
 }
 
 int main()
 {
-    //TestSystem_ReadWrite();
-    //TestSystem_HelloWorld();
+    TestSystem_ReadWrite();
+    TestSystem_HelloWorld();
     TestSystem_NesTest();
 
     return 0;

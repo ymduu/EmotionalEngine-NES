@@ -7,3 +7,9 @@ target_link_libraries(testUnit_Cassette testUtil)
 target_include_directories(testUnit_Cassette
   PRIVATE ${PROJECT_SOURCE_DIR}/Programs/src
   )
+
+add_test(
+  NAME testCassette 
+  COMMAND $<TARGET_FILE:testUnit_Cassette>
+  CONFIGURATIONS Debug 
+)

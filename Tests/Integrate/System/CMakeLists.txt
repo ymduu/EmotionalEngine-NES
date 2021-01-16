@@ -7,3 +7,9 @@ target_link_libraries(testIntegrate_System testUtil)
 target_include_directories(testIntegrate_System
   PRIVATE ${PROJECT_SOURCE_DIR}/Programs/src
   )
+
+add_test(
+  NAME testSystem_Cpu 
+  COMMAND $<TARGET_FILE:testIntegrate_System>
+  CONFIGURATIONS Debug 
+)

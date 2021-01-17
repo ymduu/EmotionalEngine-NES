@@ -1,5 +1,6 @@
 #pragma once
 #include <cassert>
+#include <cstdlib>
 #include "System.h"
 
 namespace nes { namespace detail {
@@ -16,8 +17,18 @@ namespace nes { namespace detail {
 		{
 			size_t offset = addr - PPU_REG_BASE;
 			size_t idx = offset % PPU_REG_SIZE;
-			// TODO: PPU レジスタ特有の処理(破壊読出しとか)
-			return m_pSystem->m_PpuReg[idx];
+
+			switch (idx)
+			{
+			case 2:
+				return m_pPpu->ReadPpuStatus();
+			case 7:
+				return m_pPpu->ReadPpuData();
+			default:
+				// unexpected
+				abort();
+				break;
+			}
 		}
 		else if (addr < CASSETTE_BASE) 
 		{
@@ -51,8 +62,34 @@ namespace nes { namespace detail {
 		{
 			size_t offset = addr - PPU_REG_BASE;
 			size_t idx = offset % PPU_REG_SIZE;
-			// TODO: PPU レジスタ特有の処理(破壊読出しとか)
-			m_pSystem->m_PpuReg[idx] = data;
+			switch (idx)
+			{
+			case 0:
+				m_pPpu->WritePpuCtrl(data);
+				break;
+			case 1:
+				m_pPpu->WritePpuMask(data);
+				break;
+			case 3:
+				m_pPpu->WriteOamAddr(data);
+				break;
+			case 4:
+				m_pPpu->WriteOamData(data);
+				break;
+			case 5:
+				m_pPpu->WritePpuScroll(data);
+				break;
+			case 6:
+				m_pPpu->WritePpuAddr(data);
+				break;
+			case 7:
+				m_pPpu->WritePpuData(data);
+				break;
+			default:
+				// unexpected
+				abort();
+				break;
+			}
 		}
 		else if (addr < CASSETTE_BASE)
 		{
@@ -86,7 +123,7 @@ namespace nes { namespace detail {
 			size_t offset = addr - NAMETABLE_BASE;
 			// mirror
 			size_t idx = offset % NAMETABLE_SIZE;
-			return m_pSystem->m_PpuSystem.m_NameTable[idx];
+			return m_pPpuSystem->m_NameTable[idx];
 		}
 		else
 		{
@@ -94,7 +131,7 @@ namespace nes { namespace detail {
 			size_t offset = addr - PALETTE_BASE;
 			size_t idx = offset % PALETTE_SIZE;
 
-			return m_pSystem->m_PpuSystem.m_Pallettes[idx];
+			return m_pPpuSystem->m_Pallettes[idx];
 		}
 	}
 
@@ -111,7 +148,7 @@ namespace nes { namespace detail {
 			size_t offset = addr - NAMETABLE_BASE;
 			// mirror
 			size_t idx = offset % NAMETABLE_SIZE;
-			return m_pSystem->m_PpuSystem.m_NameTable[idx];
+			return m_pPpuSystem->m_NameTable[idx];
 		}
 		else
 		{
@@ -132,7 +169,7 @@ namespace nes { namespace detail {
 			size_t offset = addr - NAMETABLE_BASE;
 			// mirror
 			size_t idx = offset % NAMETABLE_SIZE;
-			m_pSystem->m_PpuSystem.m_NameTable[idx] = data;
+			m_pPpuSystem->m_NameTable[idx] = data;
 		}
 		else
 		{
@@ -140,7 +177,7 @@ namespace nes { namespace detail {
 			size_t offset = addr - PALETTE_BASE;
 			size_t idx = offset % PALETTE_SIZE;
 
-			m_pSystem->m_PpuSystem.m_Pallettes[idx] = data;
+			m_pPpuSystem->m_Pallettes[idx] = data;
 		}
 	}
 }}

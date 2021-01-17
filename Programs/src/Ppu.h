@@ -4,6 +4,7 @@
 #include "System.h"
 
 namespace nes { namespace detail {
+	class PpuBus;
 	class Ppu {
 	public:
 		// PPU レジスタは不思議な副作用がたくさんあるので、それを実現できるようにすべてアクセサーでアクセスすることにする
@@ -31,7 +32,7 @@ namespace nes { namespace detail {
 			, PPUDATA(0)
 			, OAMDMA(0)
 			, m_VramReadBuf(0)
-			, m_PpuBus(pPpuBus)
+			, m_pPpuBus(pPpuBus)
 			, m_IsLowerPpuAddr(false)
 			, m_IsValidPpuAddr(false)
 			,m_VramAddr(0)
@@ -62,7 +63,7 @@ namespace nes { namespace detail {
 
 		uint8_t m_VramReadBuf;
 		// PPU Bus 経由で VRAM を読み書きする
-		PpuBus* m_PpuBus;
+		PpuBus* m_pPpuBus;
 
 		// 2度書き用フラグシリーズ
 		// PPUADDR は上位バイト -> 下位バイトの順にかきこみ

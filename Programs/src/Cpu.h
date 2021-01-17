@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include "constants.h"
+#include "Ppu.h"
 #include "System.h"
 
 namespace nes { namespace detail {
@@ -163,14 +164,14 @@ namespace nes { namespace detail {
         // nestest.nes 用に PC を外部からセットできる関数を公開する
         void SetPCForDebug(uint16_t newPC);
 
-        Cpu(System* pSystem)
+        Cpu(System* pSystem, Ppu* pPpu)
             :A(0)
             ,X(0)
             ,Y(0)
             ,PC(0)
             ,SP(0xFF)
             ,P(1 << 5)
-            ,m_CpuBus(pSystem)
+            ,m_CpuBus(pSystem, pPpu)
         {}
 
     private:

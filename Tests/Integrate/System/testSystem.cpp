@@ -38,7 +38,11 @@ void TestSystem_ReadWrite()
     size_t size;
     ReadHelloWorldNes(&rom, &size);
     nes::detail::System sys(rom.get(), size);
-    nes::detail::CpuBus bus(&sys);
+    nes::detail::PpuSystem ppuSys;
+    nes::detail::PpuBus ppuBus(&sys, &ppuSys);
+    nes::detail::Ppu ppu(&ppuBus);
+
+    nes::detail::CpuBus bus(&sys, &ppu);
 
     // WRAM ì«Ç›èëÇ´Ç≈Ç´ÇÈ
     // èâä˙ílÇÕ 0
@@ -79,7 +83,11 @@ void TestSystem_HelloWorld()
     size_t size;
     ReadHelloWorldNes(&rom, &size);
     nes::detail::System sys(rom.get(), size);
-    nes::detail::Cpu cpu(&sys);
+    nes::detail::PpuSystem ppuSys;
+    nes::detail::PpuBus ppuBus(&sys, &ppuSys);
+    nes::detail::Ppu ppu(&ppuBus);
+
+    nes::detail::Cpu cpu(&sys, &ppu);
 
     cpu.Interrupt(nes::detail::InterruptType::RESET);
 
@@ -115,7 +123,11 @@ void TestSystem_NesTest()
     size_t size;
     ReadNesTestNes(&rom, &size);
     nes::detail::System sys(rom.get(), size);
-    nes::detail::Cpu cpu(&sys);
+    nes::detail::PpuSystem ppuSys;
+    nes::detail::PpuBus ppuBus(&sys, &ppuSys);
+    nes::detail::Ppu ppu(&ppuBus);
+
+    nes::detail::Cpu cpu(&sys, &ppu);
 
     cpu.Interrupt(nes::detail::InterruptType::RESET);
 
@@ -150,9 +162,9 @@ void TestSystem_NesTest()
 
 int main()
 {
-    TestSystem_ReadWrite();
+    //TestSystem_ReadWrite();
     TestSystem_HelloWorld();
-    TestSystem_NesTest();
+    //TestSystem_NesTest();
 
     return 0;
 }

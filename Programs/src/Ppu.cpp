@@ -50,7 +50,7 @@ namespace nes { namespace detail {
 	}
 	void Ppu::WritePpuData(uint8_t data)
 	{
-		m_PpuBus->WriteByte(m_VramAddr, data);
+		m_pPpuBus->WriteByte(m_VramAddr, data);
 		m_VramAddr += GetVramOffset();
 	}
 
@@ -72,15 +72,15 @@ namespace nes { namespace detail {
 		if (m_VramAddr >= PALETTE_BASE)
 		{
 			// パレットテーブルは即時読み出し、 "下"にあるネームテーブルのミラーがバッファに入る
-			m_VramReadBuf = m_PpuBus->ReadByte(m_VramAddr, true);
-			uint8_t ret = m_PpuBus->ReadByte(m_VramAddr);
+			m_VramReadBuf = m_pPpuBus->ReadByte(m_VramAddr, true);
+			uint8_t ret = m_pPpuBus->ReadByte(m_VramAddr);
 			m_VramAddr += GetVramOffset();
 
 			return ret;
 		}
 		else
 		{
-			m_VramReadBuf = m_PpuBus->ReadByte(m_VramAddr);
+			m_VramReadBuf = m_pPpuBus->ReadByte(m_VramAddr);
 			m_VramAddr += GetVramOffset();
 		}
 

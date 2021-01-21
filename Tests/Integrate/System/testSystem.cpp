@@ -115,6 +115,66 @@ void TestSystem_HelloWorld()
     std::cout << "====" << __FUNCTION__ << " END ====\n";
 }
 
+void TestSystem_HelloWorld_Cpu_Ppu()
+{
+    std::cout << "==== " << __FUNCTION__ << " ====\n";
+    std::shared_ptr<uint8_t[]> rom;
+    size_t size;
+    ReadHelloWorldNes(&rom, &size);
+    nes::detail::System sys(rom.get(), size);
+    nes::detail::PpuSystem ppuSys;
+    nes::detail::PpuBus ppuBus(&sys, &ppuSys);
+    //nes::detail::Ppu ppu(&ppuBus);
+
+    auto ppu = std::make_shared<nes::detail::Ppu>(&ppuBus);
+
+    nes::detail::Cpu cpu(&sys, ppu.get());
+
+    cpu.Interrupt(nes::detail::InterruptType::RESET);
+
+    uint64_t clk = 7;
+    uint64_t inst = 1;
+
+    for (int i = 0; i < 200000; i++) {
+        // ログ出したい場合、アンコメント
+        //auto info = cpu.GetCpuInfoForDebug();
+        //test::LogCpuStatusFceuxStyle(&info, clk, inst);
+        int add = cpu.Run();
+        clk += add;
+        if (ppu->Run(add * 3)) {
+            break;
+        }
+
+        inst++;
+    }
+
+    uint8_t result[240][256];
+    ppu->GetPpuOutput(result);
+
+    for (int y = 0; y < 240; y++) {
+        for (int x = 0; x < 256; x++) {
+            switch (result[y][x]) 
+            {
+            case 0xf:
+                printf("%c", ' ');
+                break;
+            case 0x10:
+                printf("%c", ':');
+                break;
+            case 0x20:
+                printf("%c", '#');
+                break;
+            default:
+                printf("%c", '.');
+                break;
+            }
+        }
+        std::cout << "\n";
+    }
+
+    std::cout << "====" << __FUNCTION__ << " END ====\n";
+}
+
 // nestest.nes
 void TestSystem_NesTest()
 {
@@ -162,9 +222,10 @@ void TestSystem_NesTest()
 
 int main()
 {
-    //TestSystem_ReadWrite();
+    TestSystem_ReadWrite();
     TestSystem_HelloWorld();
-    //TestSystem_NesTest();
+    TestSystem_NesTest();
 
+    TestSystem_HelloWorld_Cpu_Ppu();
     return 0;
 }

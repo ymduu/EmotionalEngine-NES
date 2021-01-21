@@ -20,7 +20,12 @@ namespace nes { namespace detail {
 		uint8_t ReadPpuData();
 
 		// レジスタ読み書き 終
-		void Run(int clk);
+
+		// クロックを与えてそのクロックだけ PPU を進める、1画面分処理したら true が返る
+		bool Run(int clk);
+
+		// PPU の絵をバッファにかきこむ
+		void GetPpuOutput(uint8_t pOutBuffer[PPU_OUTPUT_Y][PPU_OUTPUT_X]);
 
 		Ppu(PpuBus* pPpuBus)
 			:PPUCTRL(0)
@@ -39,6 +44,9 @@ namespace nes { namespace detail {
 			, m_IsVerticalScrollVal(false)
 			,m_ScrollX(0)
 			,m_ScrollY(0)
+			,m_Lines(0)
+			,m_Cycles(0)
+			,m_PpuOutput{ {} }
 		{}
 
 	private:
@@ -75,10 +83,21 @@ namespace nes { namespace detail {
 		bool m_IsVerticalScrollVal;
 		uint8_t m_ScrollX;
 		uint8_t m_ScrollY;
+
+		int m_Lines;
+		int m_Cycles;
 		
 		// コントロールレジスタ 読み書き系
 		uint16_t GetVramOffset();
 		void SetVBlankFlag(bool flag);
 
+		// 座標を指定してテーブルを引いて背景色を取得する
+		uint8_t GetBackGroundPixelColor(int y, int x);
+
+		//　背景を 1 Line 分描画する
+		void BuildBackGroundLine();
+
+		// PPU の出力(絵)。 Ppu に持たせるのが適切か若干微妙だけどとりあえずここ
+		uint8_t m_PpuOutput[PPU_OUTPUT_Y][PPU_OUTPUT_X];
 	};
 }}

@@ -9,9 +9,15 @@ namespace nes { namespace detail {
 	class PpuBus;
 	class Ppu;
 
-	// PPU のメモリ空間、 System の private メンバとして持たせるので public にしておく
+	// PPU のメモリ空間
 	class PpuSystem {
+		friend PpuBus;
 	public:
+		PpuSystem()
+			:m_NameTable{}
+			, m_Pallettes{}
+		{}
+	private:
 		// 0x0000 - 0x1FFF: CHR-ROM(System のカセットを参照する)
 		// 0x2000 - 0x2FFF: Nametable
 		uint8_t m_NameTable[NAMETABLE_SIZE];
@@ -19,11 +25,6 @@ namespace nes { namespace detail {
 		// 0x3F00 - 0x3F1F: Palette
 		uint8_t m_Pallettes[PALETTE_SIZE];
 		// 0x3F20 - 0x3FFF: 0x3F00 - 0x3FFF のミラー
-
-		PpuSystem()
-			:m_NameTable{}
-			,m_Pallettes{}
-		{}
 	};
 
 	class System {

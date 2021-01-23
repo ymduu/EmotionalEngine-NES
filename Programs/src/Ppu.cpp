@@ -98,9 +98,10 @@ namespace nes { namespace detail {
 		uint8_t patternTableLower = m_pPpuBus->ReadByte(spriteNum * 16 + offsetY);
 		uint8_t patternTableUpper = m_pPpuBus->ReadByte(spriteNum * 16 + offsetY + 8);
 
-		// ‚Î‚®‚Á‚Ä‚é‚©‚à
-		uint8_t colorLower = (patternTableLower & (1 << offsetX)) == (1 << offsetX);
-		uint8_t colorUpper = (patternTableUpper & (1 << offsetX)) == (1 << offsetX);
+		int bitPos = 7 - offsetX;
+
+		uint8_t colorLower = (patternTableLower & (1 << bitPos)) == (1 << bitPos);
+		uint8_t colorUpper = (patternTableUpper & (1 << bitPos)) == (1 << bitPos);
 		colorUpper <<= 1;
 
 		uint8_t color = colorLower | colorUpper;

@@ -7,10 +7,15 @@ add_library(EmotionalNES
   Cpu.h
   Ppu.h
   System.h
+  ${PROJECT_SOURCE_DIR}/Include/Nes.h
   cassette.cpp
   Cpu.cpp
+  Nes.cpp
   Ppu.cpp
   System.cpp
   )
 
-# TODO: ライブラリのインクルードディレクトリを設定
+target_include_directories(EmotionalNES
+  PUBLIC ${PROJECT_SOURCE_DIR}/Include
+  PRIVATE ${PROJECT_SOURCE_DIR}/Programs/src/
+  )

@@ -25,7 +25,10 @@ namespace nes {
 			,m_Cpu(&m_CpuBus)
 			,m_ClockCount(0)
 			,m_InstructionCount(0)
-		{}
+		{
+			// コンストラクタで渡すと循環依存になってしまうのでここだけ Initialize で渡す
+			m_PpuBus.Initialize(&m_Cpu);
+		}
 
 		// テーブルを引いて uint8_t から RGB に変換
 		Color GetColor(uint8_t src);

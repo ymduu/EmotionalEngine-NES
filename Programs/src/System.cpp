@@ -180,4 +180,15 @@ namespace nes { namespace detail {
 			m_pPpuSystem->m_Pallettes[idx] = data;
 		}
 	}
+	void PpuBus::GenerateCpuInterrupt()
+	{
+		assert(m_IsInitialized);
+		m_pCpu->Interrupt(nes::detail::InterruptType::NMI);
+	}
+
+	void PpuBus::Initialize(Cpu* pCpu)
+	{
+		m_pCpu = pCpu;
+		m_IsInitialized = true;
+	}
 }}

@@ -2,12 +2,14 @@
 #include <stdint.h>
 #include "cassette.h"
 #include "constants.h"
+#include "Cpu.h"
 #include "Ppu.h"
 
 namespace nes { namespace detail {
 	class CpuBus;
 	class PpuBus;
 	class Ppu;
+	class Cpu;
 
 	// PPU のメモリ空間
 	class PpuSystem {
@@ -15,7 +17,7 @@ namespace nes { namespace detail {
 	public:
 		PpuSystem()
 			:m_NameTable{}
-			, m_Pallettes{}
+			,m_Pallettes{}
 		{}
 	private:
 		// 0x0000 - 0x1FFF: CHR-ROM(System のカセットを参照する)
@@ -25,6 +27,7 @@ namespace nes { namespace detail {
 		// 0x3F00 - 0x3F1F: Palette
 		uint8_t m_Pallettes[PALETTE_SIZE];
 		// 0x3F20 - 0x3FFF: 0x3F00 - 0x3FFF のミラー
+	
 	};
 
 	class System {
@@ -82,9 +85,16 @@ namespace nes { namespace detail {
 		// パレットテーブルの "下"にある nametableのミラーが PPU の内部バッファに読まれるのでそれに対応する
 		uint8_t ReadByte(uint16_t addr, bool isPpuBuffering);
 		void WriteByte(uint16_t addr, uint8_t data);
+		// オブジェクト生成時の循環依存を切るため、 Initialize で Cpu へのポインタを渡す
+		void Initialize(Cpu* pCpu);
+		// 描画終了のタイミングに合わせて NMI を入れる
+		void GenerateCpuInterrupt();
 	private:
 		System* m_pSystem;
 		PpuSystem* m_pPpuSystem;
+		// CPU にバスを繋ぐ
+		Cpu* m_pCpu;
+		bool m_IsInitialized;
 	};
 
 }}

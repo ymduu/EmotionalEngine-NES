@@ -129,6 +129,12 @@ namespace nes { namespace detail {
 		// TODO: スクロール(y と x に SCROLLレジスタの値を足すとか)
 
 		int y = m_Lines;
+		// Line 241 にきてたら NMI する
+		if (y == 241 && (PPUCTRL & (1 << 7)))
+		{
+			m_pPpuBus->GenerateCpuInterrupt();
+		}
+
 		// VBLANK にはなんもしない
 		if (y >= 240) 
 		{

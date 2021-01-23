@@ -90,6 +90,7 @@ void TestSystem_HelloWorld()
     nes::detail::CpuBus cpuBus(&sys, &ppu);
 
     nes::detail::Cpu cpu(&cpuBus);
+    ppuBus.Initialize(&cpu);
 
     cpu.Interrupt(nes::detail::InterruptType::RESET);
 
@@ -130,6 +131,7 @@ void TestSystem_HelloWorld_Cpu_Ppu()
     nes::detail::CpuBus cpuBus(&sys, &ppu);
 
     nes::detail::Cpu cpu(&cpuBus);
+    ppuBus.Initialize(&cpu);
 
     cpu.Interrupt(nes::detail::InterruptType::RESET);
 
@@ -189,6 +191,8 @@ void CreateTestCase_TestSystem_HelloWorld_Cpu_Ppu()
     nes::detail::CpuBus cpuBus(&sys, &ppu);
 
     nes::detail::Cpu cpu(&cpuBus);
+    ppuBus.Initialize(&cpu);
+
 
     cpu.Interrupt(nes::detail::InterruptType::RESET);
 
@@ -244,6 +248,7 @@ void TestSystem_NesTest()
     nes::detail::CpuBus cpuBus(&sys, &ppu);
 
     nes::detail::Cpu cpu(&cpuBus);
+    ppuBus.Initialize(&cpu);
 
     cpu.Interrupt(nes::detail::InterruptType::RESET);
 

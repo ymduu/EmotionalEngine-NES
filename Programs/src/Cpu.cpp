@@ -817,16 +817,13 @@ namespace nes { namespace detail {
         // 割り込みフラグをたてる
         SetInterruptFlag(true);
 
-        // TODO: RESET 以外も実装する
-        if (type != nes::detail::InterruptType::RESET)
-        {
-            // TORIAEZU: RESET 以外はアボート
-            abort();
-        }
-
         switch (type)
         {
         case nes::detail::InterruptType::NMI:
+            lower = m_pCpuBus->ReadByte(0xFFFA);
+            upper = m_pCpuBus->ReadByte(0xFFFB);
+
+            PC = lower | (upper << 8);
             break;
         case nes::detail::InterruptType::RESET:
             lower = m_pCpuBus->ReadByte(0xFFFC);
@@ -838,8 +835,11 @@ namespace nes { namespace detail {
             PC = lower | (upper << 8);
             break;
         case nes::detail::InterruptType::IRQ:
-            break;
         case nes::detail::InterruptType::BRK:
+            lower = m_pCpuBus->ReadByte(0xFFFE);
+            upper = m_pCpuBus->ReadByte(0xFFFF);
+
+            PC = lower | (upper << 8);
             break;
         default:
             break;

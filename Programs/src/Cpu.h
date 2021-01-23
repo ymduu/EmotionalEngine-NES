@@ -5,6 +5,7 @@
 #include "System.h"
 
 namespace nes { namespace detail {
+    class CpuBus;
     enum class Opcode {
         ADC,
         AND,

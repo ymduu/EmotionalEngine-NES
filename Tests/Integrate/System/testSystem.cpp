@@ -6,6 +6,7 @@
 #include <testUtil.h>
 #include <System.h>
 #include <Cpu.h>
+#include <set>
 
 // HELLO WORLD する ROM 読み込む
 void ReadHelloWorldNes(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
@@ -135,41 +136,96 @@ void TestSystem_HelloWorld_Cpu_Ppu()
     uint64_t clk = 7;
     uint64_t inst = 1;
 
-    for (int i = 0; i < 200000; i++) {
-        // ログ出したい場合、アンコメント
-        //auto info = cpu.GetCpuInfoForDebug();
-        //test::LogCpuStatusFceuxStyle(&info, clk, inst);
-        int add = cpu.Run();
-        clk += add;
-        if (ppu->Run(add * 3)) {
-            break;
-        }
-
-        inst++;
-    }
-
     uint8_t result[240][256];
-    ppu->GetPpuOutput(result);
+
+    // CPU を 1フレーム分動かして、 result を更新する
+    auto StepFrame = [&]() {
+        bool calculated = false;
+        while (!calculated)
+        {
+            int add = cpu.Run();
+            clk += add;
+            calculated = ppu->Run(add * 3);
+            inst++;
+        }
+        ppu->GetPpuOutput(result);
+    };
+
+    StepFrame();
+
+    // 期待値と比較
+    auto rootPath = test::GetRepositoryRootPath();
+    assert(rootPath);
+
+    auto txt = rootPath.value();
+    txt += "/Tests/TestBinaries/helloworld/expected.txt";
+
+    std::ifstream ifs(txt);
+    assert(ifs);
 
     for (int y = 0; y < 240; y++) {
         for (int x = 0; x < 256; x++) {
-            switch (result[y][x]) 
-            {
-            case 0xf:
-                printf("%c", ' ');
-                break;
-            case 0x10:
-                printf("%c", ':');
-                break;
-            case 0x20:
-                printf("%c", '#');
-                break;
-            default:
-                printf("%c", '.');
-                break;
-            }
+            int expected;
+            ifs >> expected;
+
+            assert(static_cast<uint8_t>(expected) == result[y][x]);
         }
-        std::cout << "\n";
+    }
+
+    std::cout << "====" << __FUNCTION__ << " END ====\n";
+}
+
+// PPU テストのテストケース作成
+void CreateTestCase_TestSystem_HelloWorld_Cpu_Ppu()
+{
+    std::cout << "==== " << __FUNCTION__ << " ====\n";
+    std::shared_ptr<uint8_t[]> rom;
+    size_t size;
+    ReadHelloWorldNes(&rom, &size);
+    nes::detail::System sys(rom.get(), size);
+    nes::detail::PpuSystem ppuSys;
+    nes::detail::PpuBus ppuBus(&sys, &ppuSys);
+    //nes::detail::Ppu ppu(&ppuBus);
+
+    auto ppu = std::make_shared<nes::detail::Ppu>(&ppuBus);
+
+    nes::detail::Cpu cpu(&sys, ppu.get());
+
+    cpu.Interrupt(nes::detail::InterruptType::RESET);
+
+    uint64_t clk = 7;
+    uint64_t inst = 1;
+
+    uint8_t result[240][256];
+
+    // CPU を 1フレーム分動かして、 result を更新する
+    auto StepFrame = [&]() {
+        bool calculated = false;
+        while (!calculated)
+        {
+            int add = cpu.Run();
+            clk += add;
+            calculated = ppu->Run(add * 3);
+            inst++;
+        }
+        ppu->GetPpuOutput(result);
+    };
+
+    StepFrame();
+    // result をテキストファイルに出力
+    auto rootPath = test::GetRepositoryRootPath();
+    assert(rootPath);
+
+    auto txt = rootPath.value();
+    txt += "/Tests/TestBinaries/helloworld/expected.txt";
+
+    std::ofstream ofs(txt);
+    assert(ofs);
+
+    for (int y = 0; y < 240; y++) {
+        for (int x = 0; x < 256; x++) {
+            ofs << static_cast<int>(result[y][x]) << (x == 255 ? "\n" : " ");
+        }
     }
 
     std::cout << "====" << __FUNCTION__ << " END ====\n";
@@ -222,6 +278,9 @@ void TestSystem_NesTest()
 
 int main()
 {
+    // テストケース生成したい時だけコメントアウトをもどす
+    //CreateTestCase_TestSystem_HelloWorld_Cpu_Ppu();
+
     TestSystem_ReadWrite();
     TestSystem_HelloWorld();
     TestSystem_NesTest();

@@ -164,14 +164,14 @@ namespace nes { namespace detail {
         // nestest.nes 用に PC を外部からセットできる関数を公開する
         void SetPCForDebug(uint16_t newPC);
 
-        Cpu(System* pSystem, Ppu* pPpu)
+        Cpu(CpuBus* pCpuBus)
             :A(0)
             ,X(0)
             ,Y(0)
             ,PC(0)
             ,SP(0xFF)
             ,P(1 << 5)
-            ,m_CpuBus(pSystem, pPpu)
+            ,m_pCpuBus(pCpuBus)
         {}
 
     private:
@@ -185,7 +185,7 @@ namespace nes { namespace detail {
         uint8_t P;
 
         // CPU BUS 経由でシステムを読み書きする
-        CpuBus m_CpuBus;
+        CpuBus* m_pCpuBus;
 
         // ステータスフラグをいじる関数
         void SetNegativeFlag(bool flag);

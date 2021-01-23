@@ -25,11 +25,10 @@ void Main()
 	nes::detail::System sys(rom.get(), size);
 	nes::detail::PpuSystem ppuSys;
 	nes::detail::PpuBus ppuBus(&sys, &ppuSys);
-	//nes::detail::Ppu ppu(&ppuBus);
+	nes::detail::Ppu ppu(&ppuBus);
+	nes::detail::CpuBus cpuBus(&sys, &ppu);
 
-	auto ppu = std::make_shared<nes::detail::Ppu>(&ppuBus);
-
-	nes::detail::Cpu cpu(&sys, ppu.get());
+	nes::detail::Cpu cpu(&cpuBus);
 
 	cpu.Interrupt(nes::detail::InterruptType::RESET);
 
@@ -45,10 +44,10 @@ void Main()
 		{
 			int add = cpu.Run();
 			clk += add;
-			calculated = ppu->Run(add * 3);
+			calculated = ppu.Run(add * 3);
 			inst++;
 		}
-		ppu->GetPpuOutput(result);
+		ppu.GetPpuOutput(result);
 	};
 
 	// window をファミコンサイズに

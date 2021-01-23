@@ -87,8 +87,9 @@ void TestSystem_HelloWorld()
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
     nes::detail::Ppu ppu(&ppuBus);
+    nes::detail::CpuBus cpuBus(&sys, &ppu);
 
-    nes::detail::Cpu cpu(&sys, &ppu);
+    nes::detail::Cpu cpu(&cpuBus);
 
     cpu.Interrupt(nes::detail::InterruptType::RESET);
 
@@ -125,11 +126,10 @@ void TestSystem_HelloWorld_Cpu_Ppu()
     nes::detail::System sys(rom.get(), size);
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
-    //nes::detail::Ppu ppu(&ppuBus);
+    nes::detail::Ppu ppu(&ppuBus);
+    nes::detail::CpuBus cpuBus(&sys, &ppu);
 
-    auto ppu = std::make_shared<nes::detail::Ppu>(&ppuBus);
-
-    nes::detail::Cpu cpu(&sys, ppu.get());
+    nes::detail::Cpu cpu(&cpuBus);
 
     cpu.Interrupt(nes::detail::InterruptType::RESET);
 
@@ -145,10 +145,10 @@ void TestSystem_HelloWorld_Cpu_Ppu()
         {
             int add = cpu.Run();
             clk += add;
-            calculated = ppu->Run(add * 3);
+            calculated = ppu.Run(add * 3);
             inst++;
         }
-        ppu->GetPpuOutput(result);
+        ppu.GetPpuOutput(result);
     };
 
     StepFrame();
@@ -185,11 +185,10 @@ void CreateTestCase_TestSystem_HelloWorld_Cpu_Ppu()
     nes::detail::System sys(rom.get(), size);
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
-    //nes::detail::Ppu ppu(&ppuBus);
+    nes::detail::Ppu ppu(&ppuBus);
+    nes::detail::CpuBus cpuBus(&sys, &ppu);
 
-    auto ppu = std::make_shared<nes::detail::Ppu>(&ppuBus);
-
-    nes::detail::Cpu cpu(&sys, ppu.get());
+    nes::detail::Cpu cpu(&cpuBus);
 
     cpu.Interrupt(nes::detail::InterruptType::RESET);
 
@@ -205,10 +204,10 @@ void CreateTestCase_TestSystem_HelloWorld_Cpu_Ppu()
         {
             int add = cpu.Run();
             clk += add;
-            calculated = ppu->Run(add * 3);
+            calculated = ppu.Run(add * 3);
             inst++;
         }
-        ppu->GetPpuOutput(result);
+        ppu.GetPpuOutput(result);
     };
 
     StepFrame();
@@ -242,8 +241,9 @@ void TestSystem_NesTest()
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
     nes::detail::Ppu ppu(&ppuBus);
+    nes::detail::CpuBus cpuBus(&sys, &ppu);
 
-    nes::detail::Cpu cpu(&sys, &ppu);
+    nes::detail::Cpu cpu(&cpuBus);
 
     cpu.Interrupt(nes::detail::InterruptType::RESET);
 

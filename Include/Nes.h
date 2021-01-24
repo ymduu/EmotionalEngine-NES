@@ -14,6 +14,20 @@ namespace nes {
 		uint8_t Blue;
 	};
 
+	struct EmuInfo {
+		// 雑に規定値を渡しておく
+		EmuInfo()
+			:CpuInfo(0, 0, 0, 0, 0, 0, detail::Instruction(detail::Opcode::ADC, detail::AddressingMode::Immediate, 0, 0), 0, 0)
+		{}
+
+		detail::CpuInfo CpuInfo;
+		int PpuLines;
+		int PpuCycles;
+
+		uint64_t CpuCycles;
+		uint64_t CpuInstructionCount;
+	};
+
 	class Emulator {
 	public:
 		Emulator(std::shared_ptr<uint8_t[]> rom, size_t romSize)
@@ -36,12 +50,16 @@ namespace nes {
 		Color GetColor(uint8_t src);
 		// 1フレーム進める
 		void StepFrame();
+		// 1命令進める、1 フレーム完成してたら true が返る
+		bool Step();
 		// テーブル変換前の絵を取得
 		void GetPicture(uint8_t pBuffer[240][256]);
 		// テーブル変換後の絵を取得
 		void GetPicture(Color pBuffer[240][256]);
 
-		// TODO: System とかの状態を取れる API を整備
+		// TODO: RAM, VRAM もとれるようにする
+		// CPU と PPU の情報を取得
+		void GetEmuInfo(EmuInfo* pOutInfo);
 
 	private:
 		std::shared_ptr<uint8_t[]> m_Rom;

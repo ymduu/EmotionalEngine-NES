@@ -284,14 +284,21 @@ void TestSystem_NesTest()
 
 void TestSystem_NesTest_Emulator()
 {
-    std::cout << "==== " << __FUNCTION__ << " ====\n";
+    //std::cout << "==== " << __FUNCTION__ << " ====\n";
     std::shared_ptr<uint8_t[]> rom;
     size_t size;
     ReadNesTestNes(&rom, &size);
 
     nes::Emulator emu(rom, size);
 
-    emu.StepFrame();
+    // 雑に 70000 命令くらいステップする
+    for (int i = 0; i < 70000; i++) {
+        nes::EmuInfo info;
+        emu.GetEmuInfo(&info);
+        test::LogEmuStatusNintendulatorStyle(&info);
+
+        emu.Step();
+    }
 
     std::cout << "====" << __FUNCTION__ << " END ====\n";
 }

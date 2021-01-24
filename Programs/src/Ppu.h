@@ -27,6 +27,9 @@ namespace nes { namespace detail {
 		// PPU の絵をバッファにかきこむ
 		void GetPpuOutput(uint8_t pOutBuffer[PPU_OUTPUT_Y][PPU_OUTPUT_X]);
 
+		// PPUの情報を取得
+		void GetPpuInfo(int* pLines, int* pCycles);
+
 		Ppu(PpuBus* pPpuBus)
 			:PPUCTRL(0)
 			, PPUMASK(0)

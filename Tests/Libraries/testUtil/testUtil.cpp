@@ -91,4 +91,22 @@ namespace test {
 		// クロックサイクル 出す版
 		printf("A:%02hhX X:%02hhX Y:%02hhX P:%2hhX SP:%02hhX CYC:%llu\n", info->A, info->X, info->Y, info->P, info->SP, cycles);
 	}
+
+	void LogEmuStatusNintendulatorStyle(nes::EmuInfo* info)
+	{
+		printf("%X  ", info->CpuInfo.PC);
+		for (int i = 0; i < 3; i++) {
+			if (i < info->CpuInfo.m_Instruction.m_Bytes)
+			{
+				printf("%02hhX ", info->CpuInfo.m_InstructionBytes[i]);
+			}
+			else
+			{
+				printf("   ");
+			}
+		}
+		printf("                                 ");
+		// クロックサイクル 出す版
+		printf("A:%02hhX X:%02hhX Y:%02hhX P:%2hhX SP:%02hhX PPU:%3d,%3d CYC:%llu\n", info->CpuInfo.A, info->CpuInfo.X, info->CpuInfo.Y, info->CpuInfo.P, info->CpuInfo.SP, info->PpuCycles, info->PpuLines, info->CpuCycles);
+	}
 }

@@ -36,10 +36,21 @@ namespace nes {
 		{
 			int add = m_Cpu.Run();
 			m_ClockCount += add;
-			finished = m_Ppu.Run(add);
+			finished = m_Ppu.Run(add * 3);
 			m_InstructionCount++;
 		}
 	}
+
+	bool Emulator::Step()
+	{
+		int add = m_Cpu.Run();
+		m_ClockCount += add;
+		bool ret = m_Ppu.Run(add * 3);
+		m_InstructionCount++;
+
+		return ret;
+	}
+
 	Color Emulator::GetColor(uint8_t color)
 	{
 		return g_Color[color];
@@ -63,5 +74,12 @@ namespace nes {
 				pBuffer[y][x] = GetColor(raw[y][x]);
 			}
 		}
+	}
+	void Emulator::GetEmuInfo(EmuInfo* pOutInfo)
+	{
+		pOutInfo->CpuInfo = m_Cpu.GetCpuInfoForDebug();
+		m_Ppu.GetPpuInfo(&(pOutInfo->PpuLines), &(pOutInfo->PpuCycles));
+		pOutInfo->CpuCycles = m_ClockCount;
+		pOutInfo->CpuInstructionCount = m_InstructionCount;
 	}
 }

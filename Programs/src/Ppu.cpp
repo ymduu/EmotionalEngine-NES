@@ -256,4 +256,10 @@ namespace nes { namespace detail {
 	{
 		return (PPUCTRL & (1 << 2)) ? 32 : 1;
 	}
+
+	void Ppu::GetPpuInfo(int* pLines, int* pCycles)
+	{
+		*pLines = m_Lines;
+		*pCycles = m_Cycles;
+	}
 }}

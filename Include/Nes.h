@@ -23,11 +23,13 @@ namespace nes {
 			,m_Ppu(&m_PpuBus)
 			,m_CpuBus(&m_System, &m_Ppu)
 			,m_Cpu(&m_CpuBus)
-			,m_ClockCount(0)
-			,m_InstructionCount(0)
+			,m_ClockCount(7)
+			,m_InstructionCount(1)
 		{
 			// コンストラクタで渡すと循環依存になってしまうのでここだけ Initialize で渡す
 			m_PpuBus.Initialize(&m_Cpu);
+			// Reset 割り込み
+			m_Cpu.Interrupt(nes::detail::InterruptType::RESET);
 		}
 
 		// テーブルを引いて uint8_t から RGB に変換

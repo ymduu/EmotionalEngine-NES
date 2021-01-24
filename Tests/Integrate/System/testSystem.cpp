@@ -6,6 +6,7 @@
 #include <testUtil.h>
 #include <System.h>
 #include <Cpu.h>
+#include <Nes.h>
 #include <set>
 
 // HELLO WORLD する ROM 読み込む
@@ -281,15 +282,30 @@ void TestSystem_NesTest()
     std::cout << "==== " << __FUNCTION__ << " OK ====\n";
 }
 
+void TestSystem_NesTest_Emulator()
+{
+    std::cout << "==== " << __FUNCTION__ << " ====\n";
+    std::shared_ptr<uint8_t[]> rom;
+    size_t size;
+    ReadNesTestNes(&rom, &size);
+
+    nes::Emulator emu(rom, size);
+
+    emu.StepFrame();
+
+    std::cout << "====" << __FUNCTION__ << " END ====\n";
+}
+
 int main()
 {
     // テストケース生成したい時だけコメントアウトをもどす
     //CreateTestCase_TestSystem_HelloWorld_Cpu_Ppu();
 
-    TestSystem_ReadWrite();
-    TestSystem_HelloWorld();
-    TestSystem_NesTest();
+    //TestSystem_ReadWrite();
+    //TestSystem_HelloWorld();
+    //TestSystem_NesTest();
 
-    TestSystem_HelloWorld_Cpu_Ppu();
+    //TestSystem_HelloWorld_Cpu_Ppu();
+    TestSystem_NesTest_Emulator();
     return 0;
 }

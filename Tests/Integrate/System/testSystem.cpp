@@ -32,6 +32,17 @@ void ReadNesTestNes(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
     test::ReadFile(nesFile, pOutBuf, pOutSize);
 }
 
+void ReadPpuVblNes(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
+{
+    auto rootPath = test::GetRepositoryRootPath();
+    assert(rootPath);
+
+    auto nesFile = rootPath.value();
+    nesFile += "/Tests/TestBinaries/ppu_vbl_nmi/ppu_vbl_nmi.nes";
+
+    test::ReadFile(nesFile, pOutBuf, pOutSize);
+}
+
 // 各アドレスを読み書きする、とりあえず WRAM とカセット だけ
 void TestSystem_ReadWrite()
 {
@@ -308,11 +319,11 @@ int main()
     // テストケース生成したい時だけコメントアウトをもどす
     //CreateTestCase_TestSystem_HelloWorld_Cpu_Ppu();
 
-    //TestSystem_ReadWrite();
-    //TestSystem_HelloWorld();
-    //TestSystem_NesTest();
+    TestSystem_ReadWrite();
+    TestSystem_HelloWorld();
+    TestSystem_NesTest();
 
-    //TestSystem_HelloWorld_Cpu_Ppu();
-    TestSystem_NesTest_Emulator();
+    TestSystem_HelloWorld_Cpu_Ppu();
+    //TestSystem_NesTest_Emulator();
     return 0;
 }

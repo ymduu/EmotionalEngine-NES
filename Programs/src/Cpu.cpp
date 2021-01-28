@@ -811,6 +811,14 @@ namespace nes { namespace detail {
 
     void Cpu::Interrupt(InterruptType type)
     {
+        // nested interrupt ‚ª‹–‚³‚ê‚é‚Ì‚Í RESET ‚Æ NMI ‚Ì‚Ý
+        bool nested = GetInterruptFlag();
+
+        if (nested && (type == InterruptType::BRK || type == InterruptType::IRQ))
+        {
+            return;
+        }
+
         uint16_t lower = 0;
         uint16_t upper = 0;
 
@@ -820,12 +828,24 @@ namespace nes { namespace detail {
         switch (type)
         {
         case nes::detail::InterruptType::NMI:
+        {
+            SetBreakFlag(false);
+            PushStack(static_cast<uint8_t>(PC >> 8));
+            PushStack(static_cast<uint8_t>(PC));
+
+            // NMI, IRQ ‚Ì‚Æ‚«‚Í 5, 4 bit –Ú‚ð 10‚É‚·‚é
+            uint8_t pushData = P & 0b11001111;
+            pushData |= (1 << 5);
+            PushStack(pushData);
+
             lower = m_pCpuBus->ReadByte(0xFFFA);
             upper = m_pCpuBus->ReadByte(0xFFFB);
 
             PC = lower | (upper << 8);
             break;
+        }
         case nes::detail::InterruptType::RESET:
+        {
             lower = m_pCpuBus->ReadByte(0xFFFC);
             upper = m_pCpuBus->ReadByte(0xFFFD);
 
@@ -834,13 +854,44 @@ namespace nes { namespace detail {
 
             PC = lower | (upper << 8);
             break;
+        }
         case nes::detail::InterruptType::IRQ:
-        case nes::detail::InterruptType::BRK:
+        {
+            SetBreakFlag(false);
+            PushStack(static_cast<uint8_t>(PC >> 8));
+            PushStack(static_cast<uint8_t>(PC));
+
+            // NMI, IRQ ‚Ì‚Æ‚«‚Í 5, 4 bit –Ú‚ð 10‚É‚·‚é
+            uint8_t pushData = P & 0b11001111;
+            pushData |= (1 << 5);
+            PushStack(pushData);
+
             lower = m_pCpuBus->ReadByte(0xFFFE);
             upper = m_pCpuBus->ReadByte(0xFFFF);
 
             PC = lower | (upper << 8);
             break;
+        }
+        case nes::detail::InterruptType::BRK:
+        {
+            SetBreakFlag(true);
+            PC++;
+
+            // PC push
+            PushStack(static_cast<uint8_t>(PC >> 8));
+            PushStack(static_cast<uint8_t>(PC));
+
+            // BRK ‚Ì‚Æ‚«‚Í 5, 4 bit–Ú‚ð 11 ‚É‚·‚é‚Ì‚ÅŽG‚É OR ‚·‚é‚¾‚¯‚Å‚¢‚¢
+            uint8_t pushData = P;
+            pushData |= 0b110000;
+            PushStack(pushData);
+
+            lower = m_pCpuBus->ReadByte(0xFFFE);
+            upper = m_pCpuBus->ReadByte(0xFFFF);
+
+            PC = lower | (upper << 8);
+            break;
+        }
         default:
             break;
         }

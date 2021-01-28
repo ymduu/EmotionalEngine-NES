@@ -71,6 +71,17 @@ namespace nes { namespace detail {
 			m_Cycles -= 341;
 			BuildBackGroundLine();
 			m_Lines++;
+			// Line 241 にきてたら NMI する
+			if (m_Lines == 241)
+			{
+				// VBLANK フラグ立てる
+				SetVBlankFlag(true);
+
+				if (PPUCTRL & (1 << 7))
+				{
+					m_pPpuBus->GenerateCpuInterrupt();
+				}
+			}
 		}
 		if (m_Lines == PPU_OUTPUT_Y + PPU_VBLANK_Y)
 		{
@@ -129,11 +140,6 @@ namespace nes { namespace detail {
 		// TODO: スクロール(y と x に SCROLLレジスタの値を足すとか)
 
 		int y = m_Lines;
-		// Line 241 にきてたら NMI する
-		if (y == 241 && (PPUCTRL & (1 << 7)))
-		{
-			m_pPpuBus->GenerateCpuInterrupt();
-		}
 
 		// VBLANK にはなんもしない
 		if (y >= 240) 
@@ -214,10 +220,13 @@ namespace nes { namespace detail {
 		m_IsLowerPpuAddr = false;
 		m_IsValidPpuAddr = false;
 
+		// VBLANK フラグ クリアする前に値を保持しておく
+		uint8_t ret = PPUSTATUS;
+
 		// VBlank フラグをクリア
 		SetVBlankFlag(false);
 
-		return PPUSTATUS;
+		return ret;
 	}
 	uint8_t Ppu::ReadPpuData()
 	{

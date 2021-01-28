@@ -11,8 +11,8 @@ namespace {
 		assert(rootPath);
 
 		auto nesFile = rootPath.value();
-		nesFile += "/Tests/TestBinaries/helloworld/sample1/sample1.nes";
-		//nesFile += "/Tests/TestBinaries/nestest/nestest.nes";
+		//nesFile += "/Tests/TestBinaries/helloworld/sample1/sample1.nes";
+		nesFile += "/Tests/TestBinaries/nestest/nestest.nes";
 
 		test::ReadFile(nesFile, pOutBuf, pOutSize);
 	}

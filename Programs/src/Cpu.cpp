@@ -622,8 +622,8 @@ namespace nes { namespace detail {
         {
             uint16_t upper = 0;
             uint16_t lower = 0;
-            lower = m_CpuBus.ReadByte(PC + 1);
-            upper = m_CpuBus.ReadByte(PC + 2);
+            lower = m_pCpuBus->ReadByte(PC + 1);
+            upper = m_pCpuBus->ReadByte(PC + 2);
 
             uint16_t addr = 0;
             addr |= lower;
@@ -633,13 +633,13 @@ namespace nes { namespace detail {
         }
         else if (mode == AddressingMode::ZeroPage)
         {
-            uint16_t addr = m_CpuBus.ReadByte(PC + 1);
+            uint16_t addr = m_pCpuBus->ReadByte(PC + 1);
 
             *pOutAddr = addr;
         }
         else if (mode == AddressingMode::ZeroPageX)
         {
-            uint8_t lower = m_CpuBus.ReadByte(PC + 1);
+            uint8_t lower = m_pCpuBus->ReadByte(PC + 1);
             
             // 上位バイトへの桁上げは無視、なので uint8 のまま加算する
             lower += X;
@@ -647,7 +647,7 @@ namespace nes { namespace detail {
         }
         else if (mode == AddressingMode::ZeroPageY)
         {
-            uint8_t lower = m_CpuBus.ReadByte(PC + 1);
+            uint8_t lower = m_pCpuBus->ReadByte(PC + 1);
 
             // 上位バイトへの桁上げは無視、なので uint8 のまま加算する
             lower += Y;
@@ -657,8 +657,8 @@ namespace nes { namespace detail {
         {
             uint16_t upper = 0;
             uint16_t lower = 0;
-            lower = m_CpuBus.ReadByte(PC + 1);
-            upper = m_CpuBus.ReadByte(PC + 2);
+            lower = m_pCpuBus->ReadByte(PC + 1);
+            upper = m_pCpuBus->ReadByte(PC + 2);
 
             uint16_t addr = 0;
             addr |= lower;
@@ -679,8 +679,8 @@ namespace nes { namespace detail {
         {
             uint16_t upper = 0;
             uint16_t lower = 0;
-            lower = m_CpuBus.ReadByte(PC + 1);
-            upper = m_CpuBus.ReadByte(PC + 2);
+            lower = m_pCpuBus->ReadByte(PC + 1);
+            upper = m_pCpuBus->ReadByte(PC + 2);
 
             uint16_t addr = 0;
             addr |= lower;
@@ -698,7 +698,7 @@ namespace nes { namespace detail {
         }
         else if (mode == AddressingMode::Relative)
         {
-            uint8_t offset = m_CpuBus.ReadByte(PC + 1);
+            uint8_t offset = m_pCpuBus->ReadByte(PC + 1);
             // 符号拡張 する(若干怪しいので、バグったら疑う(最悪))
             int32_t signedOffset = static_cast<int8_t>(offset);
             // TORIAEZU: フェッチ済としたときの PC を起点にする
@@ -720,13 +720,13 @@ namespace nes { namespace detail {
         {
             // *(lower + X)
             uint8_t indirectLower = 0;
-            indirectLower = m_CpuBus.ReadByte(PC + 1);
+            indirectLower = m_pCpuBus->ReadByte(PC + 1);
             // キャリーは無視 = オーバーフローしても気にしない(符号なし整数のオーバーフローは未定義でないことを確認済み)
             uint8_t lowerAddr = indirectLower + X;
             uint8_t upperAddr = lowerAddr + 1;
             // Indirect なので、FetchAddr 内で1回参照を剥がす
-            uint16_t lower = m_CpuBus.ReadByte(lowerAddr);
-            uint16_t upper = m_CpuBus.ReadByte(upperAddr);
+            uint16_t lower = m_pCpuBus->ReadByte(lowerAddr);
+            uint16_t upper = m_pCpuBus->ReadByte(upperAddr);
 
             uint16_t addr = lower | (upper << 8);
 
@@ -736,11 +736,11 @@ namespace nes { namespace detail {
         {
             // *(lower) + Y
             // キャリーは無視 = オーバーフローしても気にしない
-            uint8_t lowerAddr = m_CpuBus.ReadByte(PC + 1);
+            uint8_t lowerAddr = m_pCpuBus->ReadByte(PC + 1);
             uint8_t upperAddr = lowerAddr + 1;
             // Indirect なので、FetchAddr 内で1回参照を剥がす
-            uint16_t lower = m_CpuBus.ReadByte(lowerAddr);
-            uint16_t upper = m_CpuBus.ReadByte(upperAddr);
+            uint16_t lower = m_pCpuBus->ReadByte(lowerAddr);
+            uint16_t upper = m_pCpuBus->ReadByte(upperAddr);
 
             uint16_t addr = lower | (upper << 8);
             uint16_t beforeAddr = addr;
@@ -761,16 +761,16 @@ namespace nes { namespace detail {
             uint8_t indirectLower = 0;
             uint8_t indirectUpper = 0;
 
-            indirectLower = m_CpuBus.ReadByte(PC + 1);
-            indirectUpper = m_CpuBus.ReadByte(PC + 2);
+            indirectLower = m_pCpuBus->ReadByte(PC + 1);
+            indirectUpper = m_pCpuBus->ReadByte(PC + 2);
 
             // インクリメントにおいて下位バイトからのキャリーを無視するために、下位バイトに加算してからキャストする(ほんまか？？？？？)
             // 符号なし整数の加算のオーバーフロー時の挙動を期待しているので、未定義かも(TODO: 調べる)
             uint8_t indirectLower2 = indirectLower + 1;
 
             // Indirect なので、FetchAddr 内で1回参照を剥がす
-            uint16_t addrLower = m_CpuBus.ReadByte(static_cast<uint16_t>(indirectLower) | (static_cast<uint16_t>(indirectUpper) << 8));
-            uint16_t addrUpper = m_CpuBus.ReadByte(static_cast<uint16_t>(indirectLower2) | (static_cast<uint16_t>(indirectUpper) << 8));
+            uint16_t addrLower = m_pCpuBus->ReadByte(static_cast<uint16_t>(indirectLower) | (static_cast<uint16_t>(indirectUpper) << 8));
+            uint16_t addrUpper = m_pCpuBus->ReadByte(static_cast<uint16_t>(indirectLower2) | (static_cast<uint16_t>(indirectUpper) << 8));
 
             uint16_t addr = addrLower | (addrUpper << 8);
             *pOutAddr = addr;
@@ -798,49 +798,100 @@ namespace nes { namespace detail {
         else if (mode == AddressingMode::Immediate)
         {
             // Immediate は PC + 1 から素直に読む
-            *pOutValue = m_CpuBus.ReadByte(PC + 1);
+            *pOutValue = m_pCpuBus->ReadByte(PC + 1);
         }
         else
         {
             // 他はアドレスがオペランドになってるはずなので、アドレスを持ってきて1回参照を剥がす(Indirect は2回参照を剥がす必要があるが、1回は FetchAddr 側で剥がしている)
             uint16_t addr = 0;
             FetchAddr(mode, &addr, pOutAdditionalCyc);
-            *pOutValue = m_CpuBus.ReadByte(addr);
+            *pOutValue = m_pCpuBus->ReadByte(addr);
         }
     }
 
     void Cpu::Interrupt(InterruptType type)
     {
+        // nested interrupt が許されるのは RESET と NMI のみ
+        bool nested = GetInterruptFlag();
+
+        if (nested && (type == InterruptType::BRK || type == InterruptType::IRQ))
+        {
+            return;
+        }
+
         uint16_t lower = 0;
         uint16_t upper = 0;
 
         // 割り込みフラグをたてる
         SetInterruptFlag(true);
 
-        // TODO: RESET 以外も実装する
-        if (type != nes::detail::InterruptType::RESET)
-        {
-            // TORIAEZU: RESET 以外はアボート
-            abort();
-        }
-
         switch (type)
         {
         case nes::detail::InterruptType::NMI:
+        {
+            SetBreakFlag(false);
+            PushStack(static_cast<uint8_t>(PC >> 8));
+            PushStack(static_cast<uint8_t>(PC));
+
+            // NMI, IRQ のときは 5, 4 bit 目を 10にする
+            uint8_t pushData = P & 0b11001111;
+            pushData |= (1 << 5);
+            PushStack(pushData);
+
+            lower = m_pCpuBus->ReadByte(0xFFFA);
+            upper = m_pCpuBus->ReadByte(0xFFFB);
+
+            PC = lower | (upper << 8);
             break;
+        }
         case nes::detail::InterruptType::RESET:
-            lower = m_CpuBus.ReadByte(0xFFFC);
-            upper = m_CpuBus.ReadByte(0xFFFD);
+        {
+            lower = m_pCpuBus->ReadByte(0xFFFC);
+            upper = m_pCpuBus->ReadByte(0xFFFD);
 
             // https://www.pagetable.com/?p=410
             SP = 0xFD;
 
             PC = lower | (upper << 8);
             break;
+        }
         case nes::detail::InterruptType::IRQ:
+        {
+            SetBreakFlag(false);
+            PushStack(static_cast<uint8_t>(PC >> 8));
+            PushStack(static_cast<uint8_t>(PC));
+
+            // NMI, IRQ のときは 5, 4 bit 目を 10にする
+            uint8_t pushData = P & 0b11001111;
+            pushData |= (1 << 5);
+            PushStack(pushData);
+
+            lower = m_pCpuBus->ReadByte(0xFFFE);
+            upper = m_pCpuBus->ReadByte(0xFFFF);
+
+            PC = lower | (upper << 8);
             break;
+        }
         case nes::detail::InterruptType::BRK:
+        {
+            SetBreakFlag(true);
+            PC++;
+
+            // PC push
+            PushStack(static_cast<uint8_t>(PC >> 8));
+            PushStack(static_cast<uint8_t>(PC));
+
+            // BRK のときは 5, 4 bit目を 11 にするので雑に OR するだけでいい
+            uint8_t pushData = P;
+            pushData |= 0b110000;
+            PushStack(pushData);
+
+            lower = m_pCpuBus->ReadByte(0xFFFE);
+            upper = m_pCpuBus->ReadByte(0xFFFF);
+
+            PC = lower | (upper << 8);
             break;
+        }
         default:
             break;
         }
@@ -849,20 +900,20 @@ namespace nes { namespace detail {
     // stack は 0x0100-0x01FF であることに気を付ける
     void Cpu::PushStack(uint8_t data)
     {
-        m_CpuBus.WriteByte(SP | (1 << 8), data);
+        m_pCpuBus->WriteByte(SP | (1 << 8), data);
         SP--;
     }
 
     uint8_t Cpu::PopStack()
     {
         SP++;
-        return m_CpuBus.ReadByte(SP | (1 << 8));
+        return m_pCpuBus->ReadByte(SP | (1 << 8));
     }
 
     uint8_t Cpu::Run()
     {
         // 命令 フェッチ
-        uint8_t instByte = m_CpuBus.ReadByte(PC);
+        uint8_t instByte = m_pCpuBus->ReadByte(PC);
         Instruction inst = ByteToInstruction(instByte);
         // TODO: 命令実行前に命令の disas と今の状態をログに出す
 
@@ -931,7 +982,7 @@ namespace nes { namespace detail {
                 uint16_t addr;
                 uint8_t dummy;
                 FetchAddr(inst.m_AddressingMode, &addr, &dummy);
-                m_CpuBus.WriteByte(addr, res);
+                m_pCpuBus->WriteByte(addr, res);
             }
 
             PC += inst.m_Bytes;
@@ -1203,7 +1254,7 @@ namespace nes { namespace detail {
 
             SetZeroFlag(zeroFlag);
             SetNegativeFlag(negativeFlag);
-            m_CpuBus.WriteByte(addr, res);
+            m_pCpuBus->WriteByte(addr, res);
 
             PC += inst.m_Bytes;
             return inst.m_Cycles + additionalCyc;
@@ -1271,7 +1322,7 @@ namespace nes { namespace detail {
 
             SetZeroFlag(zeroFlag);
             SetNegativeFlag(negativeFlag);
-            m_CpuBus.WriteByte(addr, res);
+            m_pCpuBus->WriteByte(addr, res);
 
             PC += inst.m_Bytes;
             return inst.m_Cycles + additionalCyc;
@@ -1409,7 +1460,7 @@ namespace nes { namespace detail {
             }
             else 
             {
-                m_CpuBus.WriteByte(addr, res);
+                m_pCpuBus->WriteByte(addr, res);
             }
 
             PC += inst.m_Bytes;
@@ -1505,7 +1556,7 @@ namespace nes { namespace detail {
             }
             else 
             {
-                m_CpuBus.WriteByte(addr, res);
+                m_pCpuBus->WriteByte(addr, res);
             }
 
             PC += inst.m_Bytes;
@@ -1540,7 +1591,7 @@ namespace nes { namespace detail {
             }
             else
             {
-                m_CpuBus.WriteByte(addr, res);
+                m_pCpuBus->WriteByte(addr, res);
             }
 
             PC += inst.m_Bytes;
@@ -1623,7 +1674,7 @@ namespace nes { namespace detail {
             uint8_t additionalCyc;
             FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
 
-            m_CpuBus.WriteByte(addr, A);
+            m_pCpuBus->WriteByte(addr, A);
             PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
@@ -1633,7 +1684,7 @@ namespace nes { namespace detail {
             uint8_t additionalCyc;
             FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
 
-            m_CpuBus.WriteByte(addr, X);
+            m_pCpuBus->WriteByte(addr, X);
             PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
@@ -1643,7 +1694,7 @@ namespace nes { namespace detail {
             uint8_t additionalCyc;
             FetchAddr(inst.m_AddressingMode, &addr, &additionalCyc);
 
-            m_CpuBus.WriteByte(addr, Y);
+            m_pCpuBus->WriteByte(addr, Y);
             PC += inst.m_Bytes;
             return inst.m_Cycles;
         }
@@ -1856,7 +1907,7 @@ namespace nes { namespace detail {
 
             // (memory = A & X)
             uint8_t res = A & X;
-            m_CpuBus.WriteByte(addr, res);
+            m_pCpuBus->WriteByte(addr, res);
 
             PC += inst.m_Bytes;
             return inst.m_Cycles;
@@ -1884,7 +1935,7 @@ namespace nes { namespace detail {
             SetZeroFlag(zeroFlag);
             SetNegativeFlag(negativeFlag);
             SetCarryFlag(carryFlag);
-            m_CpuBus.WriteByte(addr, res);
+            m_pCpuBus->WriteByte(addr, res);
 
             PC += inst.m_Bytes;
             // DCP は additionalCyc を足さない(多分……)
@@ -1901,7 +1952,7 @@ namespace nes { namespace detail {
             FetchArg(inst.m_AddressingMode, &arg, &additionalCyc);
 
             // INC
-            m_CpuBus.WriteByte(addr, ++arg);
+            m_pCpuBus->WriteByte(addr, ++arg);
 
             // 足し算に変換(SBC 同様)
             // http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html#:~:text=The%20definition%20of%20the%206502,fit%20into%20a%20signed%20byte.&text=For%20each%20set%20of%20input,and%20the%20overflow%20bit%20V.
@@ -1944,7 +1995,7 @@ namespace nes { namespace detail {
             uint8_t res = arg << 1;
             res |= GetCarryFlag() ? 1 : 0;
 
-            m_CpuBus.WriteByte(addr, res);
+            m_pCpuBus->WriteByte(addr, res);
 
             bool carryFlag = (arg & 0x80) == 0x80;
 
@@ -1980,7 +2031,7 @@ namespace nes { namespace detail {
 
             bool carryFlag = (arg & 1) == 1;
             SetCarryFlag(carryFlag);
-            m_CpuBus.WriteByte(addr, res);
+            m_pCpuBus->WriteByte(addr, res);
 
             // ADC
             uint16_t calc = static_cast<uint16_t>(A) + res + GetCarryFlag();
@@ -2017,7 +2068,7 @@ namespace nes { namespace detail {
             bool carryFlag = (arg & 0x80) == 0x80;
             SetCarryFlag(carryFlag);
 
-            m_CpuBus.WriteByte(addr, res);
+            m_pCpuBus->WriteByte(addr, res);
 
             // ORA
             res |= A;
@@ -2048,7 +2099,7 @@ namespace nes { namespace detail {
             bool carryFlag = (arg & 1) == 1;
             SetCarryFlag(carryFlag);
 
-            m_CpuBus.WriteByte(addr, res);
+            m_pCpuBus->WriteByte(addr, res);
 
             // EOR
             res ^= A;
@@ -2097,14 +2148,14 @@ namespace nes { namespace detail {
     CpuInfo Cpu::GetCpuInfoForDebug()
     {
         // いまの PC から 命令 取得
-        uint8_t opcode = m_CpuBus.ReadByte(PC);
+        uint8_t opcode = m_pCpuBus->ReadByte(PC);
         Instruction inst = ByteToInstruction(opcode);
         uint8_t instBytes[3];
 
         assert(inst.m_Bytes <= 3);
         for (int i = 0; i < inst.m_Bytes; i++)
         {
-            uint8_t byte = m_CpuBus.ReadByte(i + PC);
+            uint8_t byte = m_pCpuBus->ReadByte(i + PC);
             instBytes[i] = byte;
         }
 

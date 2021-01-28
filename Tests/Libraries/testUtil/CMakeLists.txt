@@ -10,4 +10,5 @@ add_library(testUtil
 target_include_directories(testUtil
   PUBLIC ${PROJECT_SOURCE_DIR}/Tests/Includes
   PUBLIC ${PROJECT_SOURCE_DIR}/Programs/src
+  PUBLIC ${PROJECT_SOURCE_DIR}/Include
   )

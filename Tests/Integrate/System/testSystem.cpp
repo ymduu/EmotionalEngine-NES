@@ -6,6 +6,8 @@
 #include <testUtil.h>
 #include <System.h>
 #include <Cpu.h>
+#include <Nes.h>
+#include <set>
 
 // HELLO WORLD する ROM 読み込む
 void ReadHelloWorldNes(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
@@ -30,6 +32,17 @@ void ReadNesTestNes(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
     test::ReadFile(nesFile, pOutBuf, pOutSize);
 }
 
+void ReadPpuVblNes(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
+{
+    auto rootPath = test::GetRepositoryRootPath();
+    assert(rootPath);
+
+    auto nesFile = rootPath.value();
+    nesFile += "/Tests/TestBinaries/ppu_vbl_nmi/ppu_vbl_nmi.nes";
+
+    test::ReadFile(nesFile, pOutBuf, pOutSize);
+}
+
 // 各アドレスを読み書きする、とりあえず WRAM とカセット だけ
 void TestSystem_ReadWrite()
 {
@@ -38,7 +51,11 @@ void TestSystem_ReadWrite()
     size_t size;
     ReadHelloWorldNes(&rom, &size);
     nes::detail::System sys(rom.get(), size);
-    nes::detail::CpuBus bus(&sys);
+    nes::detail::PpuSystem ppuSys;
+    nes::detail::PpuBus ppuBus(&sys, &ppuSys);
+    nes::detail::Ppu ppu(&ppuBus);
+
+    nes::detail::CpuBus bus(&sys, &ppu);
 
     // WRAM 読み書きできる
     // 初期値は 0
@@ -79,7 +96,13 @@ void TestSystem_HelloWorld()
     size_t size;
     ReadHelloWorldNes(&rom, &size);
     nes::detail::System sys(rom.get(), size);
-    nes::detail::Cpu cpu(&sys);
+    nes::detail::PpuSystem ppuSys;
+    nes::detail::PpuBus ppuBus(&sys, &ppuSys);
+    nes::detail::Ppu ppu(&ppuBus);
+    nes::detail::CpuBus cpuBus(&sys, &ppu);
+
+    nes::detail::Cpu cpu(&cpuBus);
+    ppuBus.Initialize(&cpu);
 
     cpu.Interrupt(nes::detail::InterruptType::RESET);
 
@@ -107,6 +130,122 @@ void TestSystem_HelloWorld()
     std::cout << "====" << __FUNCTION__ << " END ====\n";
 }
 
+void TestSystem_HelloWorld_Cpu_Ppu()
+{
+    std::cout << "==== " << __FUNCTION__ << " ====\n";
+    std::shared_ptr<uint8_t[]> rom;
+    size_t size;
+    ReadHelloWorldNes(&rom, &size);
+    nes::detail::System sys(rom.get(), size);
+    nes::detail::PpuSystem ppuSys;
+    nes::detail::PpuBus ppuBus(&sys, &ppuSys);
+    nes::detail::Ppu ppu(&ppuBus);
+    nes::detail::CpuBus cpuBus(&sys, &ppu);
+
+    nes::detail::Cpu cpu(&cpuBus);
+    ppuBus.Initialize(&cpu);
+
+    cpu.Interrupt(nes::detail::InterruptType::RESET);
+
+    uint64_t clk = 7;
+    uint64_t inst = 1;
+
+    uint8_t result[240][256];
+
+    // CPU を 1フレーム分動かして、 result を更新する
+    auto StepFrame = [&]() {
+        bool calculated = false;
+        while (!calculated)
+        {
+            int add = cpu.Run();
+            clk += add;
+            calculated = ppu.Run(add * 3);
+            inst++;
+        }
+        ppu.GetPpuOutput(result);
+    };
+
+    StepFrame();
+
+    // 期待値と比較
+    auto rootPath = test::GetRepositoryRootPath();
+    assert(rootPath);
+
+    auto txt = rootPath.value();
+    txt += "/Tests/TestBinaries/helloworld/expected.txt";
+
+    std::ifstream ifs(txt);
+    assert(ifs);
+
+    for (int y = 0; y < 240; y++) {
+        for (int x = 0; x < 256; x++) {
+            int expected;
+            ifs >> expected;
+
+            assert(static_cast<uint8_t>(expected) == result[y][x]);
+        }
+    }
+
+    std::cout << "====" << __FUNCTION__ << " END ====\n";
+}
+
+// PPU テストのテストケース作成
+void CreateTestCase_TestSystem_HelloWorld_Cpu_Ppu()
+{
+    std::cout << "==== " << __FUNCTION__ << " ====\n";
+    std::shared_ptr<uint8_t[]> rom;
+    size_t size;
+    ReadHelloWorldNes(&rom, &size);
+    nes::detail::System sys(rom.get(), size);
+    nes::detail::PpuSystem ppuSys;
+    nes::detail::PpuBus ppuBus(&sys, &ppuSys);
+    nes::detail::Ppu ppu(&ppuBus);
+    nes::detail::CpuBus cpuBus(&sys, &ppu);
+
+    nes::detail::Cpu cpu(&cpuBus);
+    ppuBus.Initialize(&cpu);
+
+
+    cpu.Interrupt(nes::detail::InterruptType::RESET);
+
+    uint64_t clk = 7;
+    uint64_t inst = 1;
+
+    uint8_t result[240][256];
+
+    // CPU を 1フレーム分動かして、 result を更新する
+    auto StepFrame = [&]() {
+        bool calculated = false;
+        while (!calculated)
+        {
+            int add = cpu.Run();
+            clk += add;
+            calculated = ppu.Run(add * 3);
+            inst++;
+        }
+        ppu.GetPpuOutput(result);
+    };
+
+    StepFrame();
+    // result をテキストファイルに出力
+    auto rootPath = test::GetRepositoryRootPath();
+    assert(rootPath);
+
+    auto txt = rootPath.value();
+    txt += "/Tests/TestBinaries/helloworld/expected.txt";
+
+    std::ofstream ofs(txt);
+    assert(ofs);
+
+    for (int y = 0; y < 240; y++) {
+        for (int x = 0; x < 256; x++) {
+            ofs << static_cast<int>(result[y][x]) << (x == 255 ? "\n" : " ");
+        }
+    }
+
+    std::cout << "====" << __FUNCTION__ << " END ====\n";
+}
+
 // nestest.nes
 void TestSystem_NesTest()
 {
@@ -115,7 +254,13 @@ void TestSystem_NesTest()
     size_t size;
     ReadNesTestNes(&rom, &size);
     nes::detail::System sys(rom.get(), size);
-    nes::detail::Cpu cpu(&sys);
+    nes::detail::PpuSystem ppuSys;
+    nes::detail::PpuBus ppuBus(&sys, &ppuSys);
+    nes::detail::Ppu ppu(&ppuBus);
+    nes::detail::CpuBus cpuBus(&sys, &ppu);
+
+    nes::detail::Cpu cpu(&cpuBus);
+    ppuBus.Initialize(&cpu);
 
     cpu.Interrupt(nes::detail::InterruptType::RESET);
 
@@ -148,11 +293,37 @@ void TestSystem_NesTest()
     std::cout << "==== " << __FUNCTION__ << " OK ====\n";
 }
 
+void TestSystem_NesTest_Emulator()
+{
+    //std::cout << "==== " << __FUNCTION__ << " ====\n";
+    std::shared_ptr<uint8_t[]> rom;
+    size_t size;
+    ReadNesTestNes(&rom, &size);
+
+    nes::Emulator emu(rom, size);
+
+    // 雑に 70000 命令くらいステップする
+    for (int i = 0; i < 70000; i++) {
+        nes::EmuInfo info;
+        emu.GetEmuInfo(&info);
+        test::LogEmuStatusNintendulatorStyle(&info);
+
+        emu.Step();
+    }
+
+    std::cout << "====" << __FUNCTION__ << " END ====\n";
+}
+
 int main()
 {
+    // テストケース生成したい時だけコメントアウトをもどす
+    //CreateTestCase_TestSystem_HelloWorld_Cpu_Ppu();
+
     TestSystem_ReadWrite();
     TestSystem_HelloWorld();
     TestSystem_NesTest();
 
+    TestSystem_HelloWorld_Cpu_Ppu();
+    //TestSystem_NesTest_Emulator();
     return 0;
 }

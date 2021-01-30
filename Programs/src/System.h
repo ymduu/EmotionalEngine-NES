@@ -1,8 +1,10 @@
 #pragma once
 #include <stdint.h>
+#include <Nes_Pad.h>
 #include "cassette.h"
 #include "constants.h"
 #include "Cpu.h"
+#include "Pad.h"
 #include "Ppu.h"
 
 namespace nes { namespace detail {
@@ -10,6 +12,7 @@ namespace nes { namespace detail {
 	class PpuBus;
 	class Ppu;
 	class Cpu;
+
 
 	// PPU ‚Ìƒƒ‚ƒŠ‹óŠÔ
 	class PpuSystem {
@@ -42,7 +45,9 @@ namespace nes { namespace detail {
 			m_Cassette.Initialize(pBuffer, bufferSize);
 		}
 
-		// TODO: PAD ‘€ì‚ğ‚·‚éŠÖ”‚ğŒöŠJ‚·‚é
+		void PushButton(PadId id, PadButton button);
+		void ReleaseButton(PadId id, PadButton button);
+
 		// TODO: VRAM ‚Ì’†g‚ğæ“¾‚·‚éŠÖ”‚ğŒöŠJ‚·‚é
 	private:
 		// 0x0000 - 0x07FF: WRAM
@@ -54,6 +59,9 @@ namespace nes { namespace detail {
 
 		// 0x4000 - 0x401F: APU IO, PAD
 		uint8_t m_IoReg[APU_IO_REG_SIZE];
+
+		// Pad: 0x4016, 0x4017
+		Pad m_Pads[2];
 
 		detail::Cassette m_Cassette;
 	};

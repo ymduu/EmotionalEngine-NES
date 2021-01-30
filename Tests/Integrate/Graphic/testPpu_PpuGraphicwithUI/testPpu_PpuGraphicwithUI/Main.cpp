@@ -37,6 +37,74 @@ void Main()
 
 	while (System::Update())
 	{
+		// キー入力
+		if (KeyLeft.down())
+		{
+			emu.PushButton(nes::PadId::Zero, nes::PadButton::LEFT);
+		}
+		if (KeyRight.down())
+		{
+			emu.PushButton(nes::PadId::Zero, nes::PadButton::RIGHT);
+		}
+		if (KeyUp.down())
+		{
+			emu.PushButton(nes::PadId::Zero, nes::PadButton::UP);
+		}
+		if (KeyDown.down())
+		{
+			emu.PushButton(nes::PadId::Zero, nes::PadButton::DOWN);
+		}
+
+		if (KeyLeft.up())
+		{
+			emu.ReleaseButton(nes::PadId::Zero, nes::PadButton::LEFT);
+		}
+		if (KeyRight.up())
+		{
+			emu.ReleaseButton(nes::PadId::Zero, nes::PadButton::RIGHT);
+		}
+		if (KeyUp.up())
+		{
+			emu.ReleaseButton(nes::PadId::Zero, nes::PadButton::UP);
+		}
+		if (KeyDown.up())
+		{
+			emu.ReleaseButton(nes::PadId::Zero, nes::PadButton::DOWN);
+		}
+
+		if (KeyZ.down())
+		{
+			emu.PushButton(nes::PadId::Zero, nes::PadButton::A);
+		}
+		if (KeyZ.up())
+		{
+			emu.ReleaseButton(nes::PadId::Zero, nes::PadButton::A);
+		}
+		if (KeyX.down())
+		{
+			emu.PushButton(nes::PadId::Zero, nes::PadButton::B);
+		}
+		if (KeyX.up())
+		{
+			emu.ReleaseButton(nes::PadId::Zero, nes::PadButton::B);
+		}
+		if (KeyS.down())
+		{
+			emu.PushButton(nes::PadId::Zero, nes::PadButton::SELECT);
+		}
+		if (KeyS.up())
+		{
+			emu.ReleaseButton(nes::PadId::Zero, nes::PadButton::SELECT);
+		}
+		if (KeyA.down())
+		{
+			emu.PushButton(nes::PadId::Zero, nes::PadButton::START);
+		}
+		if (KeyA.up())
+		{
+			emu.ReleaseButton(nes::PadId::Zero, nes::PadButton::START);
+		}
+
 		emu.StepFrame();
 		emu.GetPicture(result);
 		for (int y = 0; y < 240; y++) {

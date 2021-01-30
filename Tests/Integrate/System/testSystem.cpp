@@ -293,7 +293,8 @@ void TestSystem_NesTest()
     std::cout << "==== " << __FUNCTION__ << " OK ====\n";
 }
 
-void TestSystem_NesTest_Emulator()
+// EmuInfo ‚ÉŠî‚Ã‚¢‚Ä 70000 –½—ß‚­‚ç‚¢ƒƒOo‚µ
+void TestSystem_NesTest_Emulator_Log()
 {
     //std::cout << "==== " << __FUNCTION__ << " ====\n";
     std::shared_ptr<uint8_t[]> rom;
@@ -324,6 +325,6 @@ int main()
     TestSystem_NesTest();
 
     TestSystem_HelloWorld_Cpu_Ppu();
-    //TestSystem_NesTest_Emulator();
+    //TestSystem_NesTest_Emulator_Log();
     return 0;
 }

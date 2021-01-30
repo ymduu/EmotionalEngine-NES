@@ -5,12 +5,15 @@ add_library(EmotionalNES
   cassette.h
   constants.h
   Cpu.h
+  Pad.h
   Ppu.h
   System.h
   ${PROJECT_SOURCE_DIR}/Include/Nes.h
+  ${PROJECT_SOURCE_DIR}/Include/Nes_Pad.h
   cassette.cpp
   Cpu.cpp
   Nes.cpp
+  Pad.cpp
   Ppu.cpp
   System.cpp
   )

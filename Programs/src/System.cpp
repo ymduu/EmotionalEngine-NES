@@ -4,6 +4,30 @@
 #include "System.h"
 
 namespace nes { namespace detail {
+	void System::PushButton(PadId id, PadButton button)
+	{
+		if (id == PadId::Zero)
+		{
+			m_Pads[0].PushButton(button);
+		}
+		if (id == PadId::One)
+		{
+			m_Pads[1].PushButton(button);
+		}
+	}
+	void System::ReleaseButton(PadId id, PadButton button)
+	{
+		if (id == PadId::Zero)
+		{
+			m_Pads[0].ReleaseButton(button);
+		}
+		if (id == PadId::One)
+		{
+			m_Pads[1].ReleaseButton(button);
+		}
+	}
+
+
 	uint8_t CpuBus::ReadByte(uint16_t addr)
 	{
 		// WRAM からの読み出し
@@ -33,7 +57,19 @@ namespace nes { namespace detail {
 		else if (addr < CASSETTE_BASE) 
 		{
 			size_t idx = addr - APU_IO_REG_BASE;
-			// TODO: PAD, APU 実装
+			// TODO: APU 実装
+
+			// Pad
+			if (addr == 0x4016)
+			{
+				return m_pSystem->m_Pads[0].ReadPad();
+			}
+			else if (addr == 0x4017)
+			{
+				return m_pSystem->m_Pads[1].ReadPad();
+			}
+
+			// TORIAEZU: 未実装のレジスタ読み出しは残しておく
 			return m_pSystem->m_IoReg[idx];
 		}
 		else 
@@ -95,7 +131,18 @@ namespace nes { namespace detail {
 		{
 			size_t idx = addr - APU_IO_REG_BASE;
 			// TODO: PAD, APU 実装
+			// TORIAEZU: 疑似書き込みは残しておく(意味ないけど)
 			m_pSystem->m_IoReg[idx] = data;
+
+			// Pad
+			if (addr == 0x4016)
+			{
+				m_pSystem->m_Pads[0].SetStrobe(static_cast<bool>(data & 1));
+			}
+			else if (addr == 0x4017)
+			{
+				m_pSystem->m_Pads[1].SetStrobe(static_cast<bool>(data & 1));
+			}
 		}
 		else
 		{

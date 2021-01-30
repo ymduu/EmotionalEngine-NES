@@ -5,6 +5,7 @@
 #include <Cpu.h>
 #include <Ppu.h>
 #include <System.h>
+#include <Nes_Pad.h>
 
 namespace nes {
 	struct Color
@@ -60,6 +61,10 @@ namespace nes {
 		// TODO: RAM, VRAM ‚à‚Æ‚ê‚é‚æ‚¤‚É‚·‚é
 		// CPU ‚Æ PPU ‚Ìî•ñ‚ğæ“¾
 		void GetEmuInfo(EmuInfo* pOutInfo);
+
+		// Pad ‚Ìƒ{ƒ^ƒ“‰Ÿ‚·
+		void PushButton(PadId id, PadButton button);
+		void ReleaseButton(PadId id, PadButton button);
 
 	private:
 		std::shared_ptr<uint8_t[]> m_Rom;

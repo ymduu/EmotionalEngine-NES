@@ -82,4 +82,13 @@ namespace nes {
 		pOutInfo->CpuCycles = m_ClockCount;
 		pOutInfo->CpuInstructionCount = m_InstructionCount;
 	}
+
+	void Emulator::PushButton(PadId id, PadButton button)
+	{
+		m_System.PushButton(id, button);
+	}
+	void Emulator::ReleaseButton(PadId id, PadButton button)
+	{
+		m_System.ReleaseButton(id, button);
+	}
 }

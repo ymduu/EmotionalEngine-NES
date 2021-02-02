@@ -20,6 +20,9 @@ namespace nes {
 	// ネームテーブルをインデックス指定するときに必要……
 	const size_t NAME_TABLE_AND_ATTRIBUTE_TABLE_SINGLE_SIZE = NAME_TABLE_SINGLE_SIZE + ATTRIBUTE_TABLE_SINGLE_SIZE;
 
+	// OAM(Object Attribute Memory / Sprite Memory)
+	const size_t OAM_SIZE = 256;
+
 	// Base Addr
 	const uint16_t PPU_REG_BASE = 0x2000;
 	const uint16_t APU_IO_REG_BASE = 0x4000;

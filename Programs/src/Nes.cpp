@@ -34,7 +34,10 @@ namespace nes {
 		bool finished = false;
 		while (!finished)
 		{
+			// DMA ‰Ò“­’†‚Í CPU ~‚Ü‚é‚Ì‚ÅA‚±‚ê‚Å‚Â‚¶‚Â‚Ü‚ª‡‚¤
+			int dmaClk = m_CpuBus.RunDma(m_ClockCount);
 			int add = m_Cpu.Run();
+			m_ClockCount += dmaClk;
 			m_ClockCount += add;
 			finished = m_Ppu.Run(add * 3);
 			m_InstructionCount++;
@@ -43,7 +46,10 @@ namespace nes {
 
 	bool Emulator::Step()
 	{
+		// DMA ‰Ò“­’†‚Í CPU ~‚Ü‚é‚Ì‚ÅA‚±‚ê‚Å‚Â‚¶‚Â‚Ü‚ª‡‚¤
+		int dmaClk = m_CpuBus.RunDma(m_ClockCount);
 		int add = m_Cpu.Run();
+		m_ClockCount += dmaClk;
 		m_ClockCount += add;
 		bool ret = m_Ppu.Run(add * 3);
 		m_InstructionCount++;

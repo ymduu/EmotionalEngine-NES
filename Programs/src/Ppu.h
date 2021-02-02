@@ -5,7 +5,11 @@
 
 namespace nes { namespace detail {
 	class PpuBus;
+	class CpuBus;
+
 	class Ppu {
+		// CPU バスからの書き込みを許す
+		friend CpuBus;
 	public:
 		// PPU レジスタは不思議な副作用がたくさんあるので、それを実現できるようにすべてアクセサーでアクセスすることにする
 		void WritePpuCtrl(uint8_t data);
@@ -49,6 +53,7 @@ namespace nes { namespace detail {
 			,m_ScrollY(0)
 			,m_Lines(0)
 			,m_Cycles(0)
+			, m_Oam{}
 			,m_PpuOutput{ {} }
 		{}
 
@@ -99,6 +104,9 @@ namespace nes { namespace detail {
 
 		//　背景を 1 Line 分描画する
 		void BuildBackGroundLine();
+
+		// PPU は 256 byte の Object Attribute Memory(Sprite を書き込む場所)をもつ
+		uint8_t m_Oam[OAM_SIZE];
 
 		// PPU の出力(絵)。 Ppu に持たせるのが適切か若干微妙だけどとりあえずここ
 		uint8_t m_PpuOutput[PPU_OUTPUT_Y][PPU_OUTPUT_X];

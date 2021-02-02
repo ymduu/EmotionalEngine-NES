@@ -176,7 +176,10 @@ namespace nes { namespace detail {
 	}
 	void Ppu::WriteOamData(uint8_t data)
 	{
-		// TODO: OAM 書き込み + アドレスを1インクリメント
+		// 普通は DMA されるらしいので、あまり叩かれないかも
+		// OAMADDR インクリメントの根拠: http://pgate1.at-ninja.jp/NES_on_FPGA/nes_ppu.htm
+		m_Oam[OAMADDR] = data;
+		OAMADDR++;
 	}
 	void Ppu::WritePpuScroll(uint8_t data)
 	{

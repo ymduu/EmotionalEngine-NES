@@ -133,6 +133,11 @@ namespace nes { namespace detail {
 			// TODO: PAD, APU ŽÀ‘•
 			// TORIAEZU: ‹^Ž—‘‚«ž‚Ý‚ÍŽc‚µ‚Ä‚¨‚­(ˆÓ–¡‚È‚¢‚¯‚Ç)
 			m_pSystem->m_IoReg[idx] = data;
+			// DMA
+			if (addr == 0x4014)
+			{
+				KickDma(data);
+			}
 
 			// Pad
 			if (addr == 0x4016)
@@ -237,5 +242,28 @@ namespace nes { namespace detail {
 	{
 		m_pCpu = pCpu;
 		m_IsInitialized = true;
+	}
+
+	int CpuBus::RunDma(uint64_t cpuCycles)
+	{
+		if (!m_IsDmaRunning) 
+		{
+			return 0;
+		}
+		assert(m_pPpu->OAMADDR == 0);
+		int addr = m_DmaUpperSrcAddr << 8;
+
+		for (int i = 0; i < OAM_SIZE; i++)
+		{
+			m_pPpu->m_Oam[i] = ReadByte(addr + i);
+		}
+
+		return  cpuCycles % 2 == 0 ? 513 : 514;
+	}
+
+	void CpuBus::KickDma(uint8_t upperSrcAddr)
+	{
+		m_DmaUpperSrcAddr = upperSrcAddr;
+		m_IsDmaRunning = true;
 	}
 }}

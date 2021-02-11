@@ -1,4 +1,5 @@
 #pragma once
+#include <utility>
 #include <stdint.h>
 #include "constants.h"
 #include "System.h"
@@ -28,6 +29,9 @@ namespace nes { namespace detail {
 		// クロックを与えてそのクロックだけ PPU を進める、1画面分処理したら true が返る
 		bool Run(int clk);
 
+		// 座標を指定してテーブルを引いて背景色を取得する
+		std::pair<uint8_t, bool> GetBackGroundPixelColor(int y, int x);
+
 		// PPU の絵をバッファにかきこむ
 		void GetPpuOutput(uint8_t pOutBuffer[PPU_OUTPUT_Y][PPU_OUTPUT_X]);
 
@@ -47,14 +51,15 @@ namespace nes { namespace detail {
 			, m_pPpuBus(pPpuBus)
 			, m_IsLowerPpuAddr(false)
 			, m_IsValidPpuAddr(false)
-			,m_VramAddr(0)
+			, m_VramAddr(0)
 			, m_IsVerticalScrollVal(false)
-			,m_ScrollX(0)
-			,m_ScrollY(0)
-			,m_Lines(0)
-			,m_Cycles(0)
+			, m_ScrollX(0)
+			, m_ScrollY(0)
+			, m_Lines(0)
+			, m_Cycles(0)
 			, m_Oam{}
-			,m_PpuOutput{ {} }
+			, m_PpuOutput{ {} }
+			, m_IsBackgroundClear{ {} }
 		{}
 
 	private:
@@ -99,9 +104,6 @@ namespace nes { namespace detail {
 		uint16_t GetVramOffset();
 		void SetVBlankFlag(bool flag);
 
-		// 座標を指定してテーブルを引いて背景色を取得する
-		uint8_t GetBackGroundPixelColor(int y, int x);
-
 		//　背景を 1 Line 分描画する
 		void BuildBackGroundLine();
 
@@ -110,5 +112,8 @@ namespace nes { namespace detail {
 
 		// PPU の出力(絵)。 Ppu に持たせるのが適切か若干微妙だけどとりあえずここ
 		uint8_t m_PpuOutput[PPU_OUTPUT_Y][PPU_OUTPUT_X];
+
+		// 背景が透明ピクセルか？
+		bool m_IsBackgroundClear[PPU_OUTPUT_Y][PPU_OUTPUT_X];
 	};
 }}

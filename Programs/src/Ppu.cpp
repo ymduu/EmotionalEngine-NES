@@ -41,6 +41,7 @@ namespace {
 		int attributeY = y / AttributeUnit;
 		int attributeX = x / AttributeUnit;
 
+		// Attribute Table の 1要素 は 32 * 32 px に1つ対応するので、 1行に8個含まれる 
 		int attributeIdx = attributeY * 8 + attributeX;
 
 		int baseX = attributeX * AttributeUnit;
@@ -91,10 +92,11 @@ namespace nes { namespace detail {
 		return false;
 	}
 
-	// 画面4枚分の座標(つまり、描画座標ではない)を入力してそのピクセルの色を取得する
-	uint8_t Ppu::GetBackGroundPixelColor(int y, int x)
+	// 画面4枚分の座標(つまり、描画座標ではない)を入力してそのピクセルの色を取得する、その色が透明かどうかも取得する
+	std::pair<uint8_t, bool> Ppu::GetBackGroundPixelColor(int y, int x)
 	{
 		auto [nametableId, tileId] = PositionToTileid(y, x);
+		// paletteIdx: Attribute Table 内の何番目のパレットを使うか？
 		auto [attributeIdx, paletteIdx] = PositionToAttributeTable(y, x);
 
 		uint32_t addr = NAMETABLE_BASE + nametableId * NAME_TABLE_AND_ATTRIBUTE_TABLE_SINGLE_SIZE + tileId;
@@ -125,13 +127,13 @@ namespace nes { namespace detail {
 		uint8_t attributeTable = m_pPpuBus->ReadByte(static_cast<uint16_t>(attributeTableAddr));
 
 		// attribute table から paletteIdx 番目の値を取り出す
-		uint8_t paletteId = attributeTable & (0b11 << paletteIdx);
+		uint8_t paletteId = attributeTable & (0b11 << (paletteIdx * 2));
 		paletteId >>= (paletteIdx * 2);
 
-		// palette[paletteId][color] が実際に絵として現れる色
+		// palette[paletteId][color] が実際に絵として現れる色。 color == 0 のときは透明色なので、その情報もまとめて返す
 		const uint16_t PaletteSize = 4;
 		uint8_t ret = m_pPpuBus->ReadByte(PALETTE_BASE + PaletteSize * paletteId + color);
-		return ret;
+		return std::make_pair(ret, color == 0);
 	}
 
 
@@ -149,7 +151,9 @@ namespace nes { namespace detail {
 
 		for (int x = 0; x < PPU_OUTPUT_X; x++)
 		{
-			m_PpuOutput[y][x] = GetBackGroundPixelColor(y, x);
+			auto [color, isClear] = GetBackGroundPixelColor(y, x);
+			m_PpuOutput[y][x] = color;
+			m_IsBackgroundClear[y][x] = isClear;
 		}
 	}
 

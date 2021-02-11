@@ -43,6 +43,17 @@ void ReadPpuVblNes(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
     test::ReadFile(nesFile, pOutBuf, pOutSize);
 }
 
+void ReadGiko005Nes(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
+{
+    auto rootPath = test::GetRepositoryRootPath();
+    assert(rootPath);
+
+    auto nesFile = rootPath.value();
+    nesFile += "/Tests/TestBinaries/giko/giko005.nes";
+
+    test::ReadFile(nesFile, pOutBuf, pOutSize);
+}
+
 // 各アドレスを読み書きする、とりあえず WRAM とカセット だけ
 void TestSystem_ReadWrite()
 {
@@ -174,15 +185,24 @@ void TestSystem_HelloWorld_Cpu_Ppu()
     auto txt = rootPath.value();
     txt += "/Tests/TestBinaries/helloworld/expected.txt";
 
+    auto txtClear = rootPath.value();
+    txtClear += "/Tests/TestBinaries/helloworld/expected_clear.txt";
+
     std::ifstream ifs(txt);
     assert(ifs);
+    std::ifstream ifs2(txtClear);
+    assert(ifs2);
 
     for (int y = 0; y < 240; y++) {
         for (int x = 0; x < 256; x++) {
             int expected;
             ifs >> expected;
 
+            int expectedClear;
+            ifs2 >> expectedClear;
+
             assert(static_cast<uint8_t>(expected) == result[y][x]);
+            assert(static_cast<int>(ppu.GetBackGroundPixelColor(y, x).second) == expectedClear);
         }
     }
 
@@ -234,12 +254,20 @@ void CreateTestCase_TestSystem_HelloWorld_Cpu_Ppu()
     auto txt = rootPath.value();
     txt += "/Tests/TestBinaries/helloworld/expected.txt";
 
+    auto clearTxt = rootPath.value();
+    clearTxt += "/Tests/TestBinaries/helloworld/expected_clear.txt";
+
     std::ofstream ofs(txt);
     assert(ofs);
+
+    // 背景が透明 or not の期待値
+    std::ofstream ofs2(clearTxt);
+    assert(ofs2);
 
     for (int y = 0; y < 240; y++) {
         for (int x = 0; x < 256; x++) {
             ofs << static_cast<int>(result[y][x]) << (x == 255 ? "\n" : " ");
+            ofs2 << ppu.GetBackGroundPixelColor(y, x).second << (x == 255 ? "\n" : " ");
         }
     }
 
@@ -315,6 +343,28 @@ void TestSystem_NesTest_Emulator_Log()
     std::cout << "====" << __FUNCTION__ << " END ====\n";
 }
 
+// giko005(スプライトレジスタ経由転送)
+void TestSystem_Giko005()
+{
+    //std::cout << "==== " << __FUNCTION__ << " ====\n";
+    std::shared_ptr<uint8_t[]> rom;
+    size_t size;
+    ReadGiko005Nes(&rom, &size);
+
+    nes::Emulator emu(rom, size);
+
+    // 雑に 70000 命令くらいステップする
+    for (int i = 0; i < 70000; i++) {
+        nes::EmuInfo info;
+        emu.GetEmuInfo(&info);
+        test::LogEmuStatusNintendulatorStyle(&info);
+
+        emu.Step();
+    }
+
+    std::cout << "====" << __FUNCTION__ << " END ====\n";
+}
+
 int main()
 {
     // テストケース生成したい時だけコメントアウトをもどす
@@ -325,6 +375,7 @@ int main()
     TestSystem_NesTest();
 
     TestSystem_HelloWorld_Cpu_Ppu();
+    TestSystem_Giko005();
     //TestSystem_NesTest_Emulator_Log();
     return 0;
 }

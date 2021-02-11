@@ -8,6 +8,34 @@ namespace nes { namespace detail {
 	class PpuBus;
 	class CpuBus;
 
+	struct Sprite
+	{
+		Sprite()
+			: y(0)
+			, patternTableIdx(0)
+			, attribute(0)
+			, x(0)
+		{}
+
+		Sprite(uint8_t aY, uint8_t aPatternTableIdx, uint8_t aAttribute, uint8_t aX)
+			: y(aY)
+			, patternTableIdx(aPatternTableIdx)
+			, attribute(aAttribute)
+			, x(aX)
+		{}
+
+		uint8_t y;
+		uint8_t patternTableIdx;
+		uint8_t attribute;
+		uint8_t x;
+	};
+
+	enum class SpriteSize 
+	{
+		SpriteSize_8x8,
+		SpriteSize_8x16,
+	};
+
 	class Ppu {
 		// CPU バスからの書き込みを許す
 		friend CpuBus;
@@ -29,8 +57,11 @@ namespace nes { namespace detail {
 		// クロックを与えてそのクロックだけ PPU を進める、1画面分処理したら true が返る
 		bool Run(int clk);
 
-		// 座標を指定してテーブルを引いて背景色を取得する
+		// 座標を指定してテーブルを引いて背景色と透明か否か(透明 = true)を取得する、テスト用に公開しておく
 		std::pair<uint8_t, bool> GetBackGroundPixelColor(int y, int x);
+
+		// スプライトの左上を原点とした座標を指定してテーブルを引いてスプライトの色と透明か否か(透明 = true)を取得する、テスト用に公開しておく
+		std::pair<uint8_t, bool> GetSpritePixelColor(Sprite sprite, int relativeY, int relativeX);
 
 		// PPU の絵をバッファにかきこむ
 		void GetPpuOutput(uint8_t pOutBuffer[PPU_OUTPUT_Y][PPU_OUTPUT_X]);
@@ -39,7 +70,7 @@ namespace nes { namespace detail {
 		void GetPpuInfo(int* pLines, int* pCycles);
 
 		Ppu(PpuBus* pPpuBus)
-			:PPUCTRL(0)
+			: PPUCTRL(0)
 			, PPUMASK(0)
 			, PPUSTATUS(0)
 			, OAMADDR(0)
@@ -106,6 +137,19 @@ namespace nes { namespace detail {
 
 		//　背景を 1 Line 分描画する
 		void BuildBackGroundLine();
+
+		// パターンテーブルのベースアドレスを取得
+		uint16_t GetBGPatternTableBase();
+		uint16_t GetSpritePatternTableBase();
+
+		// スプライトサイズを取得
+		SpriteSize GetSpriteSize();
+
+		// インデックスを指定して OAM からスプライトを一つ取得する
+		Sprite GetSprite(int idx);
+
+		// Sprite 0 hit してるか？
+		bool IsSprite0Hit(int y, int x);
 
 		// PPU は 256 byte の Object Attribute Memory(Sprite を書き込む場所)をもつ
 		uint8_t m_Oam[OAM_SIZE];

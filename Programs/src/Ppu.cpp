@@ -76,6 +76,8 @@ namespace nes { namespace detail {
 			// Line 241 にきてたら NMI する
 			if (m_Lines == 241)
 			{
+				// 画面が完成する直前に sprite 描画
+				BuildSprites();
 				// VBLANK フラグ立てる
 				SetVBlankFlag(true);
 
@@ -102,10 +104,11 @@ namespace nes { namespace detail {
 				}
 			}
 		}
-		// line 261の先頭で sprite 0 hit フラグを折る
+		// line 261の先頭で sprite 0 hit フラグ と VBlank フラグを折る
 		if (m_Lines == PPU_OUTPUT_Y + PPU_VBLANK_Y - 1)
 		{
 			PPUSTATUS &= ~PPUSTATUS_SPRITE_0_HIT;
+			SetVBlankFlag(false);
 		}
 
 		if (m_Lines == PPU_OUTPUT_Y + PPU_VBLANK_Y)
@@ -194,8 +197,8 @@ namespace nes { namespace detail {
 			relativeY = 7 - relativeY;
 		}
 
-		uint8_t patternTableLower = m_pPpuBus->ReadByte(GetSpritePatternTableBase() + sprite.patternTableIdx);
-		uint8_t patternTableUpper = m_pPpuBus->ReadByte(GetSpritePatternTableBase() + sprite.patternTableIdx + 8);
+		uint8_t patternTableLower = m_pPpuBus->ReadByte(GetSpritePatternTableBase() + sprite.patternTableIdx + relativeY);
+		uint8_t patternTableUpper = m_pPpuBus->ReadByte(GetSpritePatternTableBase() + sprite.patternTableIdx + 8 + relativeY);
 
 		int bitPos = 7 - relativeX;
 
@@ -284,6 +287,42 @@ namespace nes { namespace detail {
 			auto [color, isClear] = GetBackGroundPixelColor(y, x);
 			m_PpuOutput[y][x] = color;
 			m_IsBackgroundClear[y][x] = isClear;
+		}
+	}
+
+	void Ppu::BuildSprites()
+	{
+		// OAM に保持できるスプライトは 64 個
+		for (int i = 0; i < OAM_SIZE / sizeof(Sprite); i++)
+		{
+			Sprite sprite = GetSprite(i);
+
+			int offsetY = sprite.y + 1;
+			int offsetX = sprite.x;
+
+			for (int ry = 0; ry < 8; ry++)
+			{
+				for (int rx = 0; rx < 8; rx++)
+				{
+					auto [color, isClear] = GetSpritePixelColor(sprite, ry, rx);
+					if (isClear) {
+						// 透明色ならなんもしない
+						continue;
+					}
+
+					bool isFront = (sprite.attribute & (1 << 5)) == 0;
+					if (isFront)
+					{
+						// front: 問答無用で描画
+						m_PpuOutput[ry + offsetY][rx + offsetX] = color;
+					}
+					else if(m_IsBackgroundClear[ry + offsetY][rx + offsetX])
+					{
+						// back: 背景が透明なら描画
+						m_PpuOutput[ry + offsetY][rx + offsetX] = color;
+					}
+				}
+			}
 		}
 	}
 

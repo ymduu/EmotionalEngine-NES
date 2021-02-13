@@ -138,6 +138,9 @@ namespace nes { namespace detail {
 		//　背景を 1 Line 分描画する
 		void BuildBackGroundLine();
 
+		// スプライト を全部描画する
+		void BuildSprites();
+
 		// パターンテーブルのベースアドレスを取得
 		uint16_t GetBGPatternTableBase();
 		uint16_t GetSpritePatternTableBase();

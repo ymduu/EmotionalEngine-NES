@@ -197,8 +197,8 @@ namespace nes { namespace detail {
 			relativeY = 7 - relativeY;
 		}
 
-		uint8_t patternTableLower = m_pPpuBus->ReadByte(GetSpritePatternTableBase() + sprite.patternTableIdx + relativeY);
-		uint8_t patternTableUpper = m_pPpuBus->ReadByte(GetSpritePatternTableBase() + sprite.patternTableIdx + 8 + relativeY);
+		uint8_t patternTableLower = m_pPpuBus->ReadByte(GetSpritePatternTableBase() + sprite.patternTableIdx * static_cast<uint16_t>(PATTERN_TABLE_ELEMENT_SIZE) + relativeY);
+		uint8_t patternTableUpper = m_pPpuBus->ReadByte(GetSpritePatternTableBase() + sprite.patternTableIdx * static_cast<uint16_t>(PATTERN_TABLE_ELEMENT_SIZE) + 8 + relativeY);
 
 		int bitPos = 7 - relativeX;
 
@@ -241,8 +241,8 @@ namespace nes { namespace detail {
 		int offsetY = y % 8;
 		int offsetX = x % 8;
 
-		uint8_t patternTableLower = m_pPpuBus->ReadByte(GetBGPatternTableBase() + spriteNum * 16 + offsetY);
-		uint8_t patternTableUpper = m_pPpuBus->ReadByte(GetBGPatternTableBase() + spriteNum * 16 + offsetY + 8);
+		uint8_t patternTableLower = m_pPpuBus->ReadByte(GetBGPatternTableBase() + spriteNum * static_cast<uint16_t>(PATTERN_TABLE_ELEMENT_SIZE) + offsetY);
+		uint8_t patternTableUpper = m_pPpuBus->ReadByte(GetBGPatternTableBase() + spriteNum * static_cast<uint16_t>(PATTERN_TABLE_ELEMENT_SIZE) + offsetY + 8);
 
 		int bitPos = 7 - offsetX;
 
@@ -273,6 +273,10 @@ namespace nes { namespace detail {
 	void Ppu::BuildBackGroundLine()
 	{
 		// TODO: スクロール(y と x に SCROLLレジスタの値を足すとか)
+		// 雑 スクロール 0xfe 回避
+		if (m_ScrollY >= 240) {
+			return;
+		}
 
 		int y = m_Lines;
 
@@ -284,7 +288,14 @@ namespace nes { namespace detail {
 
 		for (int x = 0; x < PPU_OUTPUT_X; x++)
 		{
-			auto [color, isClear] = GetBackGroundPixelColor(y, x);
+			int nameTableNum = PPUCTRL & 0b11;
+			int nameTableBaseX = (nameTableNum % 2) * PPU_OUTPUT_X;
+			int nameTableBaseY = (nameTableNum / 2) * PPU_OUTPUT_Y;
+
+			int actualY = (y + m_ScrollY + nameTableBaseY) % (static_cast<int>(PPU_OUTPUT_Y) * 2);
+			int actualX = (x + m_ScrollX + nameTableBaseX) % (static_cast<int>(PPU_OUTPUT_X) * 2);
+
+			auto [color, isClear] = GetBackGroundPixelColor(actualY, actualX);
 			m_PpuOutput[y][x] = color;
 			m_IsBackgroundClear[y][x] = isClear;
 		}

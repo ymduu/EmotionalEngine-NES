@@ -68,4 +68,16 @@ namespace nes { namespace detail {
 		memcpy(m_ChrRom + offset, pBuffer, size);
 	}
 
+	Mirroring Cassette::GetMirroring()
+	{
+		if (m_Header.m_Flags6 & 1)
+		{
+			return Mirroring::Mirroring_Vertical;
+		}
+		else
+		{
+			return Mirroring::Mirroring_Horizontal;
+		}
+	}
+
 }}

@@ -111,6 +111,9 @@ namespace nes { namespace detail {
 		// 描画終了のタイミングに合わせて NMI を入れる
 		void GenerateCpuInterrupt();
 	private:
+		// カセットで指定されるミラー方法に基づいてミラー元のアドレスを計算する
+		uint16_t GetMirroredAddr(uint16_t addr);
+
 		System* m_pSystem;
 		PpuSystem* m_pPpuSystem;
 		// CPU にバスを繋ぐ

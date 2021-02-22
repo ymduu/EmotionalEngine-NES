@@ -6,6 +6,13 @@ namespace nes { namespace detail {
 	const int PRG_ROM_UNIT = 16 * 1024;
 	const int CHR_ROM_UNIT = 8 * 1024;
 
+	enum class Mirroring
+	{
+		Mirroring_Horizontal,
+		Mirroring_Vertical
+		// TODO: •Ï‚È Mirroring(4‰æ–Ê‘S•”‚Æ‚©)
+	};
+
 	struct INESHeader
 	{
 		uint8_t m_Magic[4];
@@ -40,6 +47,7 @@ namespace nes { namespace detail {
 		void WritePrgRom(const uint8_t* pBuffer, int offset, size_t size);
 		void ReadChrRom(uint8_t* pBuffer, int offset, size_t size);
 		void WriteChrRom(const uint8_t* pBuffer, int offset, size_t size);
+		Mirroring GetMirroring();
 	private:
 		uint8_t m_PrgRom[PRG_ROM_MAX];
 		uint8_t m_ChrRom[CHR_ROM_MAX];

@@ -19,6 +19,8 @@ namespace nes {
 	const size_t ATTRIBUTE_TABLE_SINGLE_SIZE = 0x40;
 	// ネームテーブルをインデックス指定するときに必要……
 	const size_t NAME_TABLE_AND_ATTRIBUTE_TABLE_SINGLE_SIZE = NAME_TABLE_SINGLE_SIZE + ATTRIBUTE_TABLE_SINGLE_SIZE;
+	// パターンテーブルをインデックス指定するときに必要(パターンテーブル1要素のサイズは16byte)
+	const size_t PATTERN_TABLE_ELEMENT_SIZE = 16;
 
 	// OAM(Object Attribute Memory / Sprite Memory)
 	const size_t OAM_SIZE = 256;
@@ -31,6 +33,8 @@ namespace nes {
 
 	// PPU Base Addr
 	const uint16_t NAMETABLE_BASE = 0x2000;
+	// 0x3000-0x3EFF にネームテーブル 4 枚分のミラー
+	const uint16_t NAMETABLE_MIRROR_BASE = 0x3000;
 	const uint16_t PALETTE_BASE = 0x3F00;
 
 	// PPU Offset

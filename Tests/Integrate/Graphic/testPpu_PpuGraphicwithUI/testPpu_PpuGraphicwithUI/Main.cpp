@@ -13,7 +13,9 @@ namespace {
 		auto nesFile = rootPath.value();
 		//nesFile += "/Tests/TestBinaries/helloworld/sample1/sample1.nes";
 		//nesFile += "/Tests/TestBinaries/nestest/nestest.nes";
-		nesFile += "/Tests/TestBinaries/giko/giko005.nes";
+		//nesFile += "/Tests/TestBinaries/giko/giko016.nes";
+		//nesFile += "/Tests/TestBinaries/rom/donkey.nes";
+		nesFile += "/Tests/TestBinaries/rom/mario.nes";
 
 		test::ReadFile(nesFile, pOutBuf, pOutSize);
 	}

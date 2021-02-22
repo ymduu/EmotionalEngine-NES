@@ -133,6 +133,11 @@ namespace nes { namespace detail {
 			// TODO: PAD, APU 実装
 			// TORIAEZU: 疑似書き込みは残しておく(意味ないけど)
 			m_pSystem->m_IoReg[idx] = data;
+			// DMA
+			if (addr == 0x4014)
+			{
+				KickDma(data);
+			}
 
 			// Pad
 			if (addr == 0x4016)
@@ -166,11 +171,13 @@ namespace nes { namespace detail {
 		}
 		else if (addr < PALETTE_BASE)
 		{
+			// mirror 計算
+			uint16_t mirroredAddr = GetMirroredAddr(addr);
+
 			// nametable 読み出し
-			size_t offset = addr - NAMETABLE_BASE;
-			// mirror
-			size_t idx = offset % NAMETABLE_SIZE;
-			return m_pPpuSystem->m_NameTable[idx];
+			size_t offset = mirroredAddr - NAMETABLE_BASE;
+
+			return m_pPpuSystem->m_NameTable[offset];
 		}
 		else
 		{
@@ -192,9 +199,12 @@ namespace nes { namespace detail {
 		if (addr >= PALETTE_BASE)
 		{
 			// パレット領域の代わりに nametable 読み出し
-			size_t offset = addr - NAMETABLE_BASE;
-			// mirror
-			size_t idx = offset % NAMETABLE_SIZE;
+			uint16_t offset = addr - NAMETABLE_MIRROR_BASE;
+			// nametable の中だったらどこかを計算してから nametable mirror を計算
+			uint16_t nameTableAddr = NAMETABLE_BASE + offset;
+			uint16_t nameTableMirroredAddr = GetMirroredAddr(nameTableAddr);
+
+			size_t idx = nameTableMirroredAddr - NAMETABLE_BASE;
 			return m_pPpuSystem->m_NameTable[idx];
 		}
 		else
@@ -212,11 +222,12 @@ namespace nes { namespace detail {
 		}
 		else if (addr < PALETTE_BASE)
 		{
+			// mirror 計算
+			uint16_t mirroredAddr = GetMirroredAddr(addr);
+
 			// nametable 書き込み
-			size_t offset = addr - NAMETABLE_BASE;
-			// mirror
-			size_t idx = offset % NAMETABLE_SIZE;
-			m_pPpuSystem->m_NameTable[idx] = data;
+			size_t offset = mirroredAddr - NAMETABLE_BASE;
+			m_pPpuSystem->m_NameTable[offset] = data;
 		}
 		else
 		{
@@ -237,5 +248,56 @@ namespace nes { namespace detail {
 	{
 		m_pCpu = pCpu;
 		m_IsInitialized = true;
+	}
+
+	uint16_t PpuBus::GetMirroredAddr(uint16_t addr)
+	{
+		// nametable 以外の範囲のアドレスが渡されたらプログラミングミス
+		assert(0x2000 <= addr && addr < 0x3000);
+
+		Mirroring mirroring = m_pSystem->m_Cassette.GetMirroring();
+		if (mirroring == Mirroring::Mirroring_Horizontal)
+		{
+			// 水平ミラー: [0x2000, 0x2400) が [0x2400, 0x2800) に、[0x2800, 0x2c00) が[0x2c00, 0x3000) にミラーされる
+			// ミラー範囲だったら雑に引き算をするぜ
+			if ((0x2400 <= addr && addr < 0x2800) ||
+				(0x2C00 <= addr && addr < 0x3000))
+			{
+				addr -= 0x400;
+			}
+		}
+		else if (mirroring == Mirroring::Mirroring_Vertical)
+		{
+			// 垂直ミラー: [0x2000, 0x2800) が [0x2800, 0x3000) にミラーされる
+			if (0x2800 <= addr)
+			{
+				addr -= 0x800;
+			}
+		}
+
+		return addr;
+	}
+
+	int CpuBus::RunDma(uint64_t cpuCycles)
+	{
+		if (!m_IsDmaRunning) 
+		{
+			return 0;
+		}
+		assert(m_pPpu->OAMADDR == 0);
+		int addr = m_DmaUpperSrcAddr << 8;
+
+		for (int i = 0; i < OAM_SIZE; i++)
+		{
+			m_pPpu->m_Oam[i] = ReadByte(addr + i);
+		}
+
+		return  cpuCycles % 2 == 0 ? 513 : 514;
+	}
+
+	void CpuBus::KickDma(uint8_t upperSrcAddr)
+	{
+		m_DmaUpperSrcAddr = upperSrcAddr;
+		m_IsDmaRunning = true;
 	}
 }}

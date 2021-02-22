@@ -14,7 +14,7 @@ namespace nes { namespace detail {
 	class Cpu;
 
 
-	// PPU のメモリ空間
+	// PPU のメモリ空間から参照される、名前が若干ややこしい(というかミスってる)が、要するに VRAM
 	class PpuSystem {
 		friend PpuBus;
 	public:
@@ -69,15 +69,28 @@ namespace nes { namespace detail {
 	// System へのポインタを持ち、CPU から見えるメモリ空間に基づいてアクセスするクラス
 	class CpuBus {
 	public:
-		CpuBus(System* pSystem, Ppu* pPpu) 
+		CpuBus(System* pSystem, Ppu* pPpu)
 			:m_pSystem(pSystem)
 			,m_pPpu(pPpu)
+			,m_IsDmaRunning(false)
+			,m_DmaUpperSrcAddr(0)
 		{}
 		uint8_t ReadByte(uint16_t addr);
 		void WriteByte(uint16_t addr, uint8_t data);
+
+		// DMA 用 API
+		// System 上のメモリから PPU 上の OAM に DMA する。 DMA は基本的に VBLANK 中に行われることに注意する。(4.5Line 分くらいのPPU時間を消費するが、それによって NMI を発生し損ねたり sprite 0 hit をし損ねたりすることはない。)
+
+		// DMA 実行してかかったクロック数を返す、 Kick されてない場合は0
+		int RunDma(uint64_t cpuCycles);
+		// 転送元の アドレスの上位バイトを与えてDMA 起動、下位バイトは 00
+		void KickDma(uint8_t upperSrcAddr);
 	private:
 		System* m_pSystem;
 		Ppu* m_pPpu;
+		// DMA は CpuBus が担う(実際の HW 構成もそうなっているはず。)
+		bool m_IsDmaRunning;
+		uint8_t m_DmaUpperSrcAddr;
 	};
 
 	// PPU から見えるメモリ空間に基づいてアクセスするクラス、PPU <-> カセット、 VRAM へのバス
@@ -98,6 +111,9 @@ namespace nes { namespace detail {
 		// 描画終了のタイミングに合わせて NMI を入れる
 		void GenerateCpuInterrupt();
 	private:
+		// カセットで指定されるミラー方法に基づいてミラー元のアドレスを計算する
+		uint16_t GetMirroredAddr(uint16_t addr);
+
 		System* m_pSystem;
 		PpuSystem* m_pPpuSystem;
 		// CPU にバスを繋ぐ

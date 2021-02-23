@@ -469,4 +469,201 @@ namespace nes { namespace detail {
 		*pLines = m_Lines;
 		*pCycles = m_Cycles;
 	}
+
+	// PPU 内部レジスタアクセサー
+	void PpuInternalRegister::SetCoarseX(PpuInternalRegistertarget target, uint8_t data)
+	{
+		// 下位 5 bit のみ有効
+		assert((0b11100000 & data) == 0);
+		if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_t)
+		{
+			t &= ~COARSE_X_MASK;
+			t |= data;
+		}
+		else if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_v)
+		{
+			v &= ~COARSE_X_MASK;
+			v |= data;
+		}
+	}
+	void PpuInternalRegister::SetCoarseY(PpuInternalRegistertarget target, uint8_t data)
+	{
+		// 下位 5 bit のみ有効
+		assert((0b11100000 & data) == 0);
+		if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_t)
+		{
+			t &= ~COARSE_Y_MASK;
+			uint16_t writeData = static_cast<uint16_t>(data) << 5;
+			t |= writeData;
+		}
+		else if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_v)
+		{
+			v &= ~COARSE_Y_MASK;
+			uint16_t writeData = static_cast<uint16_t>(data) << 5;
+			v |= writeData;
+		}
+	}
+	void PpuInternalRegister::SetNametableSelect(PpuInternalRegistertarget target, uint8_t data)
+	{
+		// 下位 2 bit のみ有効
+		assert((0b11111100 & data) == 0);
+		if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_t)
+		{
+			t &= ~NAMETABLE_SELECT_MASK;
+			uint16_t writeData = static_cast<uint16_t>(data) << 10;
+			t |= writeData;
+		}
+		else if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_v)
+		{
+			v &= ~NAMETABLE_SELECT_MASK;
+			uint16_t writeData = static_cast<uint16_t>(data) << 10;
+			v |= writeData;
+		}
+	}
+	void PpuInternalRegister::SetFineY(PpuInternalRegistertarget target, uint8_t data)
+	{
+		// 下位 3 bit のみ有効
+		assert((0b11111000 & data) == 0);
+		if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_t)
+		{
+			t &= ~FINE_Y_MASK;
+			uint16_t writeData = static_cast<uint16_t>(data) << 12;
+			t |= writeData;
+		}
+		else if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_v)
+		{
+			v &= ~FINE_Y_MASK;
+			uint16_t writeData = static_cast<uint16_t>(data) << 12;
+			v |= writeData;
+		}
+	}
+	void PpuInternalRegister::SetFineX(uint8_t data)
+	{
+		// 下位 3 bit のみ有効
+		assert((0b11111000 & data) == 0);
+		x = data;
+	}
+
+	uint8_t PpuInternalRegister::GetCoarseX(PpuInternalRegistertarget target)
+	{
+		if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_t)
+		{
+			return static_cast<uint8_t>(t & COARSE_X_MASK);
+		}
+		else if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_v)
+		{
+			return static_cast<uint8_t>(v & COARSE_X_MASK);
+		}
+		else
+		{
+			// unexpected default
+			abort();
+		}
+	}
+	uint8_t PpuInternalRegister::GetCoarseY(PpuInternalRegistertarget target)
+	{
+		if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_t)
+		{
+			return static_cast<uint8_t>(t & COARSE_Y_MASK);
+		}
+		else if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_v)
+		{
+			return static_cast<uint8_t>(v & COARSE_Y_MASK);
+		}
+		else
+		{
+			// unexpected default
+			abort();
+		}
+	}
+	uint8_t PpuInternalRegister::GetNametableSelect(PpuInternalRegistertarget target)
+	{
+		if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_t)
+		{
+			return static_cast<uint8_t>(t & NAMETABLE_SELECT_MASK);
+		}
+		else if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_v)
+		{
+			return static_cast<uint8_t>(v & NAMETABLE_SELECT_MASK);
+		}
+		else
+		{
+			// unexpected default
+			abort();
+		}
+	}
+	uint8_t PpuInternalRegister::GetFineY(PpuInternalRegistertarget target)
+	{
+		if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_t)
+		{
+			return static_cast<uint8_t>(t & FINE_Y_MASK);
+		}
+		else if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_v)
+		{
+			return static_cast<uint8_t>(v & FINE_Y_MASK);
+		}
+		else
+		{
+			// unexpected default
+			abort();
+		}
+	}
+	uint8_t PpuInternalRegister::GetFineX()
+	{
+		return x;
+	}
+
+	// 描画中のインクリメント(https://wiki.nesdev.com/w/index.php/PPU_scrolling#Wrapping_around)
+	void PpuInternalRegister::IncrementCoarseX()
+	{
+		uint8_t coarseX = GetCoarseX(PpuInternalRegistertarget::PpuInternalRegistertarget_v);
+		// tile 31 の次は 0 にもどす、上で実装したアクセサーは使わずに nesdev wiki の疑似コードをそのまま使っちゃう
+		if (coarseX == 31)
+		{
+			v &= ~0x001F;          // coarse X = 0
+			v ^= 0x0400;           // switch horizontal nametable
+		}
+		else
+		{
+			v++;
+		}
+	}
+
+	void PpuInternalRegister::IncrementY()
+	{
+		// こちらも nesdev wiki の疑似コードをそのまま使っちゃう
+		if ((v & 0x7000) != 0x7000)				// if fine Y < 7
+		{
+			v += 0x1000;						// increment fine Y
+		}
+		else
+		{
+			v &= ~0x7000;						// fine Y = 0
+			int y = (v & 0x03E0) >> 5;			// let y = coarse Y
+			if (y == 29)
+			{
+				y = 0;                          // coarse Y = 0
+				v ^= 0x0800;                    // switch vertical nametable
+			}
+			else if (y == 31)
+			{
+				y = 0;                          // coarse Y = 0, nametable not switched
+			}
+			else 
+			{
+				y += 1;							// increment coarse Y
+			}
+			v = (v & ~0x03E0) | (y << 5);		// put coarse Y back into v
+		}
+	}
+
+	// 現在のタイルと attribute table のアドレス取得(https://wiki.nesdev.com/w/index.php/PPU_scrolling#Tile_and_attribute_fetching)
+	uint16_t PpuInternalRegister::GetTileAddress()
+	{
+		return static_cast<uint16_t>(0x2000 | (v & 0x0FFF));
+	}
+	uint16_t PpuInternalRegister::GetAttributeAddress()
+	{
+		return static_cast<uint16_t>(0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07));
+	}
 }}

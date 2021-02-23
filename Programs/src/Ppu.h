@@ -30,6 +30,58 @@ namespace nes { namespace detail {
 		uint8_t x;
 	};
 
+	enum class PpuInternalRegistertarget
+	{
+		PpuInternalRegistertarget_v,
+		PpuInternalRegistertarget_t
+	};
+
+	// PPU 内部レジスタへのアクセスを提供するクラス
+	class PpuInternalRegister
+	{
+	public:
+		PpuInternalRegister()
+			: v(0)
+			, t(0)
+			, x(0)
+			, w(false)
+		{}
+
+		void SetCoarseX(PpuInternalRegistertarget target, uint8_t data);
+		void SetCoarseY(PpuInternalRegistertarget target, uint8_t data);
+		void SetNametableSelect(PpuInternalRegistertarget target, uint8_t data);
+		void SetFineY(PpuInternalRegistertarget target, uint8_t data);
+		void SetFineX(uint8_t data);
+
+		uint8_t GetCoarseX(PpuInternalRegistertarget target);
+		uint8_t GetCoarseY(PpuInternalRegistertarget target);
+		uint8_t GetNametableSelect(PpuInternalRegistertarget target);
+		uint8_t GetFineY(PpuInternalRegistertarget target);
+		uint8_t GetFineX();
+
+		// 描画中のインクリメント
+		void IncrementCoarseX();
+		void IncrementY();
+
+		// 現在のタイルと attribute table のアドレス取得
+		uint16_t GetTileAddress();
+		uint16_t GetAttributeAddress();
+
+	private:
+		// v, t : 15 bit
+		uint16_t v;
+		uint16_t t;
+		// x: 3 bit
+		uint8_t x;
+		bool w;
+
+		// constants
+		const uint16_t NAMETABLE_SELECT_MASK = 0b000110000000000;
+		const uint16_t COARSE_X_MASK		 = 0b000000000011111;
+		const uint16_t COARSE_Y_MASK		 = 0b000001111100000;
+		const uint16_t FINE_Y_MASK			 = 0b111000000000000;
+	};
+
 	enum class SpriteSize 
 	{
 		SpriteSize_8x8,
@@ -116,6 +168,9 @@ namespace nes { namespace detail {
 		uint8_t m_VramReadBuf;
 		// PPU Bus 経由で VRAM を読み書きする
 		PpuBus* m_pPpuBus;
+
+		// 描画用内部レジスタ(https://wiki.nesdev.com/w/index.php/PPU_scrolling#PPU_internal_registers)
+		PpuInternalRegister m_InternalReg;
 
 		// 2度書き用フラグシリーズ
 		// PPUADDR は上位バイト -> 下位バイトの順にかきこみ

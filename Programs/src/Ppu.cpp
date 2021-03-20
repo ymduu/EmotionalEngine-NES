@@ -5,7 +5,23 @@
 
 namespace {
 	// テーブルをひきひきするヘルパー関数
+	// tile の id と attribute table の要素 -> パレット番号
+	uint8_t GetPaletteId(int tileId, uint8_t attributeTableElement)
+	{
+		uint8_t higher = (tileId / 64) % 2 == 0 ? 0 : 1;
+		uint8_t lower = (tileId / 2) % 2 == 0 ? 0 : 1;
+		higher <<= 1;
 
+		uint8_t paletteIdx = higher | lower;
+
+		// attribute table から paletteIdx 番目の値を取り出す
+		uint8_t paletteId = attributeTableElement & (0b11 << (paletteIdx * 2));
+		paletteId >>= (paletteIdx * 2);
+
+		return paletteId;
+	}
+
+	// TODO: この辺のヘルパー関数は(nametable の解決部分が)嘘なので使っているところを撲滅して消す、 Internal Register を使う実装にすればいらないはず
 	// 座標 -> (nametable id, tile id)のペア
 	std::pair<int, int> PositionToTileid(int y, int x)
 	{
@@ -65,26 +81,22 @@ namespace nes { namespace detail {
 	bool Ppu::Run(int clk)
 	{
 		int beforeCycles = m_Cycles;
-		m_Cycles += clk;
+		int beforeLines = m_Lines;
+		
+		// クロックの加算は BG 描画しながら行う
+		DrawBackGround(clk);
 
-		// 1 ライン描画するのに 341 サイクルかかる
-		if (m_Cycles >= 341)
+		// Line 241 にきてたら NMI する
+		if (m_Lines != beforeLines && m_Lines == 241)
 		{
-			m_Cycles -= 341;
-			BuildBackGroundLine();
-			m_Lines++;
-			// Line 241 にきてたら NMI する
-			if (m_Lines == 241)
-			{
-				// 画面が完成する直前に sprite 描画
-				BuildSprites();
-				// VBLANK フラグ立てる
-				SetVBlankFlag(true);
+			// 画面が完成する直前に sprite 描画
+			BuildSprites();
+			// VBLANK フラグ立てる
+			SetVBlankFlag(true);
 
-				if (PPUCTRL & (1 << 7))
-				{
-					m_pPpuBus->GenerateCpuInterrupt();
-				}
+			if (PPUCTRL & (1 << 7))
+			{
+				m_pPpuBus->GenerateCpuInterrupt();
 			}
 		}
 
@@ -133,6 +145,7 @@ namespace nes { namespace detail {
 		return Sprite(m_Oam[offset], m_Oam[offset + 1], m_Oam[offset + 2], m_Oam[offset + 3]);
 	}
 
+	// TODO: マリオのスクロールは上手くいってるけど嘘なので PPU Internal Register に基づいた Sprite 0 hit に直す
 	bool Ppu::IsSprite0Hit(int y, int x)
 	{
 		// Sprite 0 hit が発生しない条件に当てはまっているなら早期 return しちゃう
@@ -269,35 +282,107 @@ namespace nes { namespace detail {
 		return std::make_pair(ret, color == 0);
 	}
 
-
-	void Ppu::BuildBackGroundLine()
+	void Ppu::DrawBackGround(int clk)
 	{
-		// TODO: スクロール(y と x に SCROLLレジスタの値を足すとか)
-		// 雑 スクロール 0xfe 回避
-		if (m_ScrollY >= 240) {
-			return;
-		}
-
-		int y = m_Lines;
-
-		// VBLANK にはなんもしない
-		if (y >= 240) 
+		// clk クロック PPU をすすめる
+		for (int i = 0; i < clk; i++)
 		{
-			return;
-		}
+			// 1 cycle に 1 px 描画することに注意する
+			if (m_Cycles == 0)
+			{
+				// Line の最初で Fine X Scroll を適用する
+				m_BGRelativeX = m_InternalReg.GetFineX();
+			}
 
-		for (int x = 0; x < PPU_OUTPUT_X; x++)
-		{
-			int nameTableNum = PPUCTRL & 0b11;
-			int nameTableBaseX = (nameTableNum % 2) * PPU_OUTPUT_X;
-			int nameTableBaseY = (nameTableNum / 2) * PPU_OUTPUT_Y;
+			int x = m_Cycles;
+			int y = m_Lines;
 
-			int actualY = (y + m_ScrollY + nameTableBaseY) % (static_cast<int>(PPU_OUTPUT_Y) * 2);
-			int actualX = (x + m_ScrollX + nameTableBaseX) % (static_cast<int>(PPU_OUTPUT_X) * 2);
+			// 描画範囲内なら描画する
+			if (y < PPU_OUTPUT_Y && x < PPU_OUTPUT_X)
+			{
+				uint16_t tileAddr		= m_InternalReg.GetTileAddress();
+				uint16_t attributeAddr  = m_InternalReg.GetAttributeAddress();
 
-			auto [color, isClear] = GetBackGroundPixelColor(actualY, actualX);
-			m_PpuOutput[y][x] = color;
-			m_IsBackgroundClear[y][x] = isClear;
+				uint8_t attributeTable = m_pPpuBus->ReadByte(attributeAddr);
+
+				// 使うパレットを特定する
+				// 下位 10 bit が tile id 
+				uint16_t tileId = tileAddr & 0b1111111111;
+				uint8_t paletteId = GetPaletteId(tileId, attributeTable);
+
+				// tile 内での相対座標
+				int RelativeX = m_BGRelativeX;
+				int RelativeY = m_InternalReg.GetFineY(PpuInternalRegistertarget::PpuInternalRegistertarget_v);
+
+				// nametable 引き
+				uint8_t spriteNum = m_pPpuBus->ReadByte(static_cast<uint16_t>(tileAddr));
+
+				// pattern table 引き
+				uint8_t patternTableLower = m_pPpuBus->ReadByte(GetBGPatternTableBase() + spriteNum * static_cast<uint16_t>(PATTERN_TABLE_ELEMENT_SIZE) + RelativeY);
+				uint8_t patternTableUpper = m_pPpuBus->ReadByte(GetBGPatternTableBase() + spriteNum * static_cast<uint16_t>(PATTERN_TABLE_ELEMENT_SIZE) + RelativeY + 8);
+
+				int bitPos = 7 - RelativeX;
+
+				uint8_t colorLower = (patternTableLower & (1 << bitPos)) == (1 << bitPos);
+				uint8_t colorUpper = (patternTableUpper & (1 << bitPos)) == (1 << bitPos);
+				colorUpper <<= 1;
+
+				uint8_t color = colorLower | colorUpper;
+				assert(color <= 3);
+
+				// palette[paletteId][color] が実際に絵として現れる色。 color == 0 のときは透明色
+				const uint16_t PaletteSize = 4;
+				uint8_t outColor = m_pPpuBus->ReadByte(PALETTE_BASE + PaletteSize * paletteId + color);
+
+				m_PpuOutput[y][x] = outColor;
+				m_IsBackgroundClear[y][x] = color == 0;
+
+				uint8_t masterBg = m_pPpuBus->ReadByte(PALETTE_BASE);
+				if (color == 0)
+				{
+					m_PpuOutput[y][x] = masterBg;
+				}
+			}
+
+			// v 更新
+			if (x == 257)
+			{
+				m_InternalReg.UpdateHorizontalV();
+			}
+
+			if (m_Lines == 261 && 280 <= x && x <= 304)
+			{
+				m_InternalReg.UpdateVerticalV();
+			}
+
+			// 描画座標に基づいて内部レジスタをインクリメントする
+			// Line の 256 dot 目にきてたら Y インクリメント
+			if (x == 256)
+			{
+				m_InternalReg.IncrementY();
+			}
+
+			// X の相対座標(fine X から始まる奴) が 8 になっていたら Coarse X をインクリメント
+			// Between dot 328 of a scanline, and 256 of the next scanline ???(https://wiki.nesdev.com/w/index.php/PPU_scrolling#Between_dot_328_of_a_scanline.2C_and_256_of_the_next_scanline)
+			// 境界あやしいかも
+			//if (x >= 328 || x < 256) 
+			if (x < 256)
+			{
+				m_BGRelativeX++;
+				if (m_BGRelativeX == 8)
+				{
+					m_BGRelativeX = 0;
+					m_InternalReg.IncrementCoarseX();
+				}
+			}
+
+			m_Cycles++;
+			// PPU サイクルは mod 341 で保持する(341 PPU cycles で 1 Line 描画されるので)
+			if (m_Cycles >= 341)
+			{
+				m_Cycles %= 341;
+				m_Lines++;
+			}
 		}
 	}
 
@@ -360,6 +445,10 @@ namespace nes { namespace detail {
 	void Ppu::WritePpuCtrl(uint8_t data)
 	{
 		PPUCTRL = data;
+		
+		// 内部レジスタの nametable select に反映(この辺 見る https://wiki.nesdev.com/w/index.php/PPU_scrolling#Register_controls)
+		uint8_t arg = data & 0b11;
+		m_InternalReg.SetNametableSelect(PpuInternalRegistertarget::PpuInternalRegistertarget_t, arg);
 	}
 	void Ppu::WritePpuMask(uint8_t data)
 	{
@@ -378,15 +467,23 @@ namespace nes { namespace detail {
 	}
 	void Ppu::WritePpuScroll(uint8_t data)
 	{
-		if (m_IsVerticalScrollVal)
+		if (!m_InternalReg.GetW())
 		{
-			m_ScrollY = data;
-			m_IsVerticalScrollVal = false;
+			uint8_t coarseX = data >> 3;
+			uint8_t fineX = data & 0b111;
+
+			m_InternalReg.SetCoarseX(PpuInternalRegistertarget::PpuInternalRegistertarget_t, coarseX);
+			m_InternalReg.SetFineX(fineX);
+			m_InternalReg.SetW(true);
 		}
 		else
 		{
-			m_ScrollX = data;
-			m_IsVerticalScrollVal = true;
+			uint8_t coarseY = data >> 3;
+			uint8_t fineY = data & 0b111;
+
+			m_InternalReg.SetCoarseY(PpuInternalRegistertarget::PpuInternalRegistertarget_t, coarseY);
+			m_InternalReg.SetFineY(PpuInternalRegistertarget::PpuInternalRegistertarget_t, fineY);
+			m_InternalReg.SetW(false);
 		}
 	}
 	void Ppu::WritePpuAddr(uint8_t data)
@@ -404,6 +501,16 @@ namespace nes { namespace detail {
 			m_IsLowerPpuAddr = true;
 			m_IsValidPpuAddr = false;
 		}
+
+		// 内部レジスタにも一応反映させとく
+		if (!m_InternalReg.GetW())
+		{
+			m_InternalReg.SetUpperPpuAddr(data);
+		}
+		else
+		{
+			m_InternalReg.SetLowerPpuAddr(data);
+		}
 	}
 	void Ppu::WritePpuData(uint8_t data)
 	{
@@ -414,7 +521,7 @@ namespace nes { namespace detail {
 	uint8_t Ppu::ReadPpuStatus()
 	{
 		// 2回読みフラグをリセット
-		m_IsVerticalScrollVal = false;
+		m_InternalReg.SetW(false);
 		m_IsLowerPpuAddr = false;
 		m_IsValidPpuAddr = false;
 
@@ -543,6 +650,28 @@ namespace nes { namespace detail {
 		assert((0b11111000 & data) == 0);
 		x = data;
 	}
+	void PpuInternalRegister::SetW(bool data)
+	{
+		w = data;
+	}
+	void PpuInternalRegister::SetUpperPpuAddr(uint8_t data)
+	{
+		// 上 2 bit をマスクする(https://wiki.nesdev.com/w/index.php/PPU_scrolling#Register_controls)
+		data &= 0b00111111;
+		uint16_t writeData = static_cast<uint16_t>(data) << 8;
+		t &= 0xFF;
+		t |= writeData;
+		w = true;
+	}
+	void PpuInternalRegister::SetLowerPpuAddr(uint8_t data)
+	{
+		// 下位8bit を更新するだけ
+		t &= 0xFF00;
+		t |= data;
+		v = t;
+
+		w = false;
+	}
 
 	uint8_t PpuInternalRegister::GetCoarseX(PpuInternalRegistertarget target)
 	{
@@ -564,11 +693,11 @@ namespace nes { namespace detail {
 	{
 		if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_t)
 		{
-			return static_cast<uint8_t>(t & COARSE_Y_MASK);
+			return static_cast<uint8_t>((t & COARSE_Y_MASK) >> 5);
 		}
 		else if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_v)
 		{
-			return static_cast<uint8_t>(v & COARSE_Y_MASK);
+			return static_cast<uint8_t>((v & COARSE_Y_MASK) >> 5);
 		}
 		else
 		{
@@ -580,11 +709,11 @@ namespace nes { namespace detail {
 	{
 		if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_t)
 		{
-			return static_cast<uint8_t>(t & NAMETABLE_SELECT_MASK);
+			return static_cast<uint8_t>((t & NAMETABLE_SELECT_MASK) >> 10);
 		}
 		else if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_v)
 		{
-			return static_cast<uint8_t>(v & NAMETABLE_SELECT_MASK);
+			return static_cast<uint8_t>((v & NAMETABLE_SELECT_MASK) >> 10);
 		}
 		else
 		{
@@ -596,11 +725,11 @@ namespace nes { namespace detail {
 	{
 		if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_t)
 		{
-			return static_cast<uint8_t>(t & FINE_Y_MASK);
+			return static_cast<uint8_t>((t & FINE_Y_MASK) >> 12);
 		}
 		else if (target == PpuInternalRegistertarget::PpuInternalRegistertarget_v)
 		{
-			return static_cast<uint8_t>(v & FINE_Y_MASK);
+			return static_cast<uint8_t>((v & FINE_Y_MASK) >> 12);
 		}
 		else
 		{
@@ -612,6 +741,11 @@ namespace nes { namespace detail {
 	{
 		return x;
 	}
+	bool PpuInternalRegister::GetW()
+	{
+		return w;
+	}
+
 
 	// 描画中のインクリメント(https://wiki.nesdev.com/w/index.php/PPU_scrolling#Wrapping_around)
 	void PpuInternalRegister::IncrementCoarseX()
@@ -655,6 +789,23 @@ namespace nes { namespace detail {
 			}
 			v = (v & ~0x03E0) | (y << 5);		// put coarse Y back into v
 		}
+	}
+
+	void PpuInternalRegister::UpdateHorizontalV()
+	{
+		const uint16_t HORIZONTAL_MASK = 0b000010000011111;
+		v &= ~HORIZONTAL_MASK;
+		uint16_t update = t & HORIZONTAL_MASK;
+
+		v |= update;
+	}
+	void PpuInternalRegister::UpdateVerticalV()
+	{
+		const uint16_t VERTICAL_MASK = 0b111101111100000;
+		v &= ~VERTICAL_MASK;
+		uint16_t update = t & VERTICAL_MASK;
+
+		v |= update;
 	}
 
 	// 現在のタイルと attribute table のアドレス取得(https://wiki.nesdev.com/w/index.php/PPU_scrolling#Tile_and_attribute_fetching)

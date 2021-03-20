@@ -52,12 +52,17 @@ namespace nes { namespace detail {
 		void SetNametableSelect(PpuInternalRegistertarget target, uint8_t data);
 		void SetFineY(PpuInternalRegistertarget target, uint8_t data);
 		void SetFineX(uint8_t data);
+		void SetW(bool data);
+		// PPUADDR 反映用(紛らわしいけど、 PPUADDR としては使わない、PPUADDR への書き込みと PPUSCROLL への書き込みを混ぜて使ってるゲームのため)
+		void SetUpperPpuAddr(uint8_t data);
+		void SetLowerPpuAddr(uint8_t data);
 
 		uint8_t GetCoarseX(PpuInternalRegistertarget target);
 		uint8_t GetCoarseY(PpuInternalRegistertarget target);
 		uint8_t GetNametableSelect(PpuInternalRegistertarget target);
 		uint8_t GetFineY(PpuInternalRegistertarget target);
 		uint8_t GetFineX();
+		bool GetW();
 
 		// 描画中のインクリメント
 		void IncrementCoarseX();
@@ -66,6 +71,10 @@ namespace nes { namespace detail {
 		// 現在のタイルと attribute table のアドレス取得
 		uint16_t GetTileAddress();
 		uint16_t GetAttributeAddress();
+
+		// t の変更を v に反映
+		void UpdateHorizontalV();
+		void UpdateVerticalV();
 
 	private:
 		// v, t : 15 bit
@@ -126,7 +135,6 @@ namespace nes { namespace detail {
 			, PPUMASK(0)
 			, PPUSTATUS(0)
 			, OAMADDR(0)
-			, PPUSCROLL(0)
 			, PPUADDR(0)
 			, PPUDATA(0)
 			, OAMDMA(0)
@@ -135,11 +143,9 @@ namespace nes { namespace detail {
 			, m_IsLowerPpuAddr(false)
 			, m_IsValidPpuAddr(false)
 			, m_VramAddr(0)
-			, m_IsVerticalScrollVal(false)
-			, m_ScrollX(0)
-			, m_ScrollY(0)
 			, m_Lines(0)
 			, m_Cycles(0)
+			, m_BGRelativeX(0)
 			, m_Oam{}
 			, m_PpuOutput{ {} }
 			, m_IsBackgroundClear{ {} }
@@ -156,8 +162,8 @@ namespace nes { namespace detail {
 		// 0x2003
 		uint8_t OAMADDR;
 		// 0x2004 = OAMDATA は OAM(Sprite RAM) に書かれるので保持しない
-		// 0x2005
-		uint8_t PPUSCROLL;
+		// 0x2005 PPUSCROLL の代わりに描画用内部レジスタ(https://wiki.nesdev.com/w/index.php/PPU_scrolling#PPU_internal_registers)を使う、 PPUADDR はまあそのまま使っちゃう
+		PpuInternalRegister m_InternalReg;
 		// 0x2006
 		uint8_t PPUADDR;
 		// 0x2007
@@ -169,29 +175,25 @@ namespace nes { namespace detail {
 		// PPU Bus 経由で VRAM を読み書きする
 		PpuBus* m_pPpuBus;
 
-		// 描画用内部レジスタ(https://wiki.nesdev.com/w/index.php/PPU_scrolling#PPU_internal_registers)
-		PpuInternalRegister m_InternalReg;
-
 		// 2度書き用フラグシリーズ
 		// PPUADDR は上位バイト -> 下位バイトの順にかきこみ
 		bool m_IsLowerPpuAddr;
 		// PPUADDR への2回書き込みが完了しているか？
 		bool m_IsValidPpuAddr;
 		uint16_t m_VramAddr;
-		// PPUSCROLL は水平スクロール値 -> 垂直スクロール値 の順に書き込み(NES on FPGA と NesDev で言ってることが逆だが……)
-		bool m_IsVerticalScrollVal;
-		uint8_t m_ScrollX;
-		uint8_t m_ScrollY;
 
 		int m_Lines;
 		int m_Cycles;
+		// BG のタイル内でのx座標
+		int m_BGRelativeX;
 		
 		// コントロールレジスタ 読み書き系
 		uint16_t GetVramOffset();
 		void SetVBlankFlag(bool flag);
 
-		//　背景を 1 Line 分描画する
-		void BuildBackGroundLine();
+		// クロックを受け取って、そのクロック分だけ背景描画とそれに付随する処理をする(内部レジスタX, Y のインクリメントとか)
+		// 暗黙的であんまりよくないけど、 m_Clock の加算もここでやっちゃう
+		void DrawBackGround(int clk);
 
 		// スプライト を全部描画する
 		void BuildSprites();

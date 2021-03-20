@@ -3,6 +3,16 @@
 #include <cstdlib>
 #include "System.h"
 
+namespace {
+	uint16_t GetPaletteMirrorAddr(uint16_t addr)
+	{
+		if (addr == 0x3F10 || addr == 0x3F14 || addr == 0x3F18 || addr == 0x3F1C) {
+			return addr - 0x10;
+		}
+		return addr;
+	}
+}
+
 namespace nes { namespace detail {
 	void System::PushButton(PadId id, PadButton button)
 	{
@@ -181,6 +191,8 @@ namespace nes { namespace detail {
 		}
 		else
 		{
+			addr = GetPaletteMirrorAddr(addr);
+
 			// palette ì«Ç›èoÇµ
 			size_t offset = addr - PALETTE_BASE;
 			size_t idx = offset % PALETTE_SIZE;
@@ -231,6 +243,8 @@ namespace nes { namespace detail {
 		}
 		else
 		{
+			addr = GetPaletteMirrorAddr(addr);
+
 			// palette èëÇ´çûÇ›
 			size_t offset = addr - PALETTE_BASE;
 			size_t idx = offset % PALETTE_SIZE;

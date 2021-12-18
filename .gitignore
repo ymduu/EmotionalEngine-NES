@@ -2,7 +2,6 @@ Outputs/
 build/
 
 # Siv3d Outputs
-engine/
 nlp/
 example/
 Screenshot/

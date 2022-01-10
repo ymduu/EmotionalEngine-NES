@@ -400,6 +400,12 @@ namespace nes { namespace detail {
 			{
 				for (int rx = 0; rx < 8; rx++)
 				{
+					// ÇÕÇ›èoÇµÇƒÇÈÇ»ÇÁÇ»ÇÒÇ‡ÇµÇ»Ç¢
+					if (ry + offsetY >= PPU_OUTPUT_Y || rx + offsetX >= PPU_OUTPUT_X) 
+					{
+						continue;
+					}
+
 					auto [color, isClear] = GetSpritePixelColor(sprite, ry, rx);
 					if (isClear) {
 						// ìßñæêFÇ»ÇÁÇ»ÇÒÇ‡ÇµÇ»Ç¢

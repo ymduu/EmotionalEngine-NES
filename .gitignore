@@ -1,5 +1,6 @@
 Outputs/
 build/
+*.nes
 
 # Siv3d Outputs
 nlp/

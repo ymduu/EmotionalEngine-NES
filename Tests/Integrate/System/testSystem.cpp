@@ -176,7 +176,10 @@ void TestSystem_HelloWorld_Cpu_Ppu()
         ppu.GetPpuOutput(result);
     };
 
-    StepFrame();
+    // PPU の内部レジスタの挙動を正確にしたことで、最初の数フレームは出力が乱れるようになったので30フレームくらい計算して出力が安定してから画像を取得する
+    for (int i = 0; i < 30; i++) {
+        StepFrame();
+    }
 
     // 期待値と比較
     auto rootPath = test::GetRepositoryRootPath();

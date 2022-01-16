@@ -3,8 +3,6 @@ NES エミュレータを作ってみたかった
 
 # ビルド方法
 ```
-# PPU Scrolling はまだ feature ブランチの機能なのでチェックアウトする
-$ git checkout feature/EENES-22_Implement_PPU_Scrolling
 $ mkdir ./Outputs
 $ cd Outputs 
 $ cmake ..
@@ -55,3 +53,12 @@ EmotionalNES ライブラリのソースコードを格納します。とりあ�
 {単体, 統合}テストを格納します。適宜ディレクトリを切ることにします。
 # Tests/TestBinaries
 テスト用のバイナリを配置します。主に配布されている nes のテスト用 ROM を配置して、テストから参照します。
+
+# 開発
+PR 前に以下の手順でテストを実行して通ることを確認します。  
+(ビルド方法 の手順が済んでいる前提)  
+```
+$ cd Outputs 
+$ cmake --build .
+$ ctest -C Debug
+```

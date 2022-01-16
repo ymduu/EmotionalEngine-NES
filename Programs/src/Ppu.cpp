@@ -20,61 +20,6 @@ namespace {
 
 		return paletteId;
 	}
-
-	// TODO: この辺のヘルパー関数は(nametable の解決部分が)嘘なので使っているところを撲滅して消す、 Internal Register を使う実装にすればいらないはず
-	// 座標 -> (nametable id, tile id)のペア
-	std::pair<int, int> PositionToTileid(int y, int x)
-	{
-		int nameTableId = 0;
-
-		if (y >= nes::PPU_OUTPUT_Y)
-		{
-			y -= nes::PPU_OUTPUT_Y;
-			nameTableId += 2;
-		}
-		if (x >= nes::PPU_OUTPUT_X)
-		{
-			x -= nes::PPU_OUTPUT_X;
-			nameTableId += 1;
-		}
-
-		int tileX = x / 8;
-		int tileY = y / 8;
-		int tileId = tileY * 32 + tileX;
-
-		return std::make_pair(nameTableId, tileId);
-	}
-
-	// 座標 -> (attribute table の idx, attribute table 内の idx)のペア
-	std::pair<int, int> PositionToAttributeTable(int y, int x)
-	{
-		// TODO: スクロール 対応
-
-		// パレットは 16 * 16ごと、 Attribute Table は 32 * 32 ごと  
-		const int PaletteUnit = 16;
-		const int AttributeUnit = PaletteUnit * 2;
-
-		int attributeY = y / AttributeUnit;
-		int attributeX = x / AttributeUnit;
-
-		// Attribute Table の 1要素 は 32 * 32 px に1つ対応するので、 1行に8個含まれる 
-		int attributeIdx = attributeY * 8 + attributeX;
-
-		int baseX = attributeX * AttributeUnit;
-		int baseY = attributeY * AttributeUnit;
-
-		int dx = x - baseX;
-		int dy = y - baseY;
-
-		int paletteX = dx / PaletteUnit;
-		int paletteY = dy / PaletteUnit;
-
-		int paletteIdx = paletteY * 2 + paletteX;
-
-		assert(paletteIdx <= 3);
-
-		return std::make_pair(attributeIdx, paletteIdx);
-	}
 }
 
 namespace nes { namespace detail {
@@ -145,7 +90,8 @@ namespace nes { namespace detail {
 		return Sprite(m_Oam[offset], m_Oam[offset + 1], m_Oam[offset + 2], m_Oam[offset + 3]);
 	}
 
-	// TODO: マリオのスクロールは上手くいってるけど嘘なので PPU Internal Register に基づいた Sprite 0 hit に直す
+	// PPU Internal Register に基づいた BackGround 描画に基づいた Sprite 0 hit
+	// pre: 当該 Run において、 DrawBackGround(clk) 済
 	bool Ppu::IsSprite0Hit(int y, int x)
 	{
 		// Sprite 0 hit が発生しない条件に当てはまっているなら早期 return しちゃう
@@ -154,7 +100,7 @@ namespace nes { namespace detail {
 		bool enableBg			  = (PPUMASK & PPUMASKS_ENABLE_BG)		    == PPUMASKS_ENABLE_BG;
 		bool enableSprite		  = (PPUMASK & PPUMASKS_ENABLE_SPRITE)      == PPUMASKS_ENABLE_SPRITE;
 
-		// クリッピング有効 or {背景 or スプライト描画無効ならスプライト0hitしない}
+		// クリッピング有効 or {背景 or スプライト描画無効} ならスプライト0hitしない
 		if (enableClippingBg || enableClippingSprite || !enableBg || !enableSprite)
 		{
 			return false;
@@ -164,7 +110,7 @@ namespace nes { namespace detail {
 		// OAM に格納されるy座標は -1 されてるので足す
 		sprite0.y++;
 
-		// 相対座標 計算
+		// スプライト内の相対座標 計算
 		int relativeY = y - sprite0.y;
 		int relativeX = x - sprite0.x;
 
@@ -180,7 +126,8 @@ namespace nes { namespace detail {
 			}
 			// 範囲内 なら pattern table 引く、今回ほしいのは 透明 or not だけなので second だけ見る
 			bool isSpriteClear = GetSpritePixelColor(sprite0, relativeY, relativeX).second;
-			bool isBgClear = GetBackGroundPixelColor(y, x).second;
+			// 事前条件(DrawBackGround(clk) 済)を満たしていれば、 m_IsBackgroundClear[y][x] には既に正しい値が入っているはずなので、これでよいはず
+			bool isBgClear = m_IsBackgroundClear[y][x];
 
 			// 両方不透明なら hit
 			return (!isSpriteClear && !isBgClear) ? true : false;
@@ -238,48 +185,11 @@ namespace nes { namespace detail {
 		return std::make_pair(ret, color == 0);
 	}
 
-	// 画面4枚分の座標(つまり、描画座標ではない)を入力してそのピクセルの色を取得する、その色が透明かどうかも取得する
+	// 画面内座標(描画座標)を入力してそのピクセルの色を取得する、その色が透明かどうかも取得する
+	// 実装には使われないが、テスト用に残しておく
 	std::pair<uint8_t, bool> Ppu::GetBackGroundPixelColor(int y, int x)
 	{
-		auto [nametableId, tileId] = PositionToTileid(y, x);
-		// paletteIdx: Attribute Table 内の何番目のパレットを使うか？
-		auto [attributeIdx, paletteIdx] = PositionToAttributeTable(y, x);
-
-		uint32_t addr = NAMETABLE_BASE + nametableId * NAME_TABLE_AND_ATTRIBUTE_TABLE_SINGLE_SIZE + tileId;
-		// ネームテーブル / 属性テーブルがある領域のアドレスに収まっててほしい
-		assert(addr < 0x3F00);
-
-		uint8_t spriteNum = m_pPpuBus->ReadByte(static_cast<uint16_t>(addr));
-		// 背景のスプライトは 8 * 8 なので、 8 で割った余りで offset が出る
-		int offsetY = y % 8;
-		int offsetX = x % 8;
-
-		uint8_t patternTableLower = m_pPpuBus->ReadByte(GetBGPatternTableBase() + spriteNum * static_cast<uint16_t>(PATTERN_TABLE_ELEMENT_SIZE) + offsetY);
-		uint8_t patternTableUpper = m_pPpuBus->ReadByte(GetBGPatternTableBase() + spriteNum * static_cast<uint16_t>(PATTERN_TABLE_ELEMENT_SIZE) + offsetY + 8);
-
-		int bitPos = 7 - offsetX;
-
-		uint8_t colorLower = (patternTableLower & (1 << bitPos)) == (1 << bitPos);
-		uint8_t colorUpper = (patternTableUpper & (1 << bitPos)) == (1 << bitPos);
-		colorUpper <<= 1;
-
-		uint8_t color = colorLower | colorUpper;
-		assert(color <= 3);
-
-		// attribute table からパレットの id を求める
-		uint32_t attributeTableAddr = NAMETABLE_BASE + nametableId * NAME_TABLE_AND_ATTRIBUTE_TABLE_SINGLE_SIZE + NAME_TABLE_SINGLE_SIZE + attributeIdx;
-		assert(attributeTableAddr < 0x3F00);
-
-		uint8_t attributeTable = m_pPpuBus->ReadByte(static_cast<uint16_t>(attributeTableAddr));
-
-		// attribute table から paletteIdx 番目の値を取り出す
-		uint8_t paletteId = attributeTable & (0b11 << (paletteIdx * 2));
-		paletteId >>= (paletteIdx * 2);
-
-		// palette[paletteId][color] が実際に絵として現れる色。 color == 0 のときは透明色なので、その情報もまとめて返す
-		const uint16_t PaletteSize = 4;
-		uint8_t ret = m_pPpuBus->ReadByte(PALETTE_BASE + PaletteSize * paletteId + color);
-		return std::make_pair(ret, color == 0);
+		return std::make_pair(m_PpuOutput[y][x], m_IsBackgroundClear[y][x]);
 	}
 
 	void Ppu::DrawBackGround(int clk)

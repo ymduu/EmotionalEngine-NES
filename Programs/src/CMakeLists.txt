@@ -2,6 +2,7 @@
 # 辞書順に配置すること
 add_library(EmotionalNES
   STATIC
+  Apu.h
   cassette.h
   constants.h
   Cpu.h
@@ -10,6 +11,7 @@ add_library(EmotionalNES
   System.h
   ${PROJECT_SOURCE_DIR}/Include/Nes.h
   ${PROJECT_SOURCE_DIR}/Include/Nes_Pad.h
+  Apu.cpp
   cassette.cpp
   Cpu.cpp
   Nes.cpp

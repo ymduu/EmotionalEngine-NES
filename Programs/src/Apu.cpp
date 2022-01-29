@@ -349,7 +349,7 @@ namespace nes { namespace detail {
 					ClockQuarterFrame();
 				}
 				if (isHalfFrame) {
-					ClockHalfFrame;
+					ClockHalfFrame();
 				}
 				if (isRaiseIrq) {
 					// TODO: CpuBus ‚ğg‚Á‚Ä IRQ Š„‚è‚İ‚ğã‚°‚é

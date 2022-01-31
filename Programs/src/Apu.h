@@ -6,6 +6,7 @@
 
 namespace nes { namespace detail {
 	class CpuBus;
+	class ApuBus;
 	enum SequencerMode
 	{
 		Mode_4Step,
@@ -16,7 +17,7 @@ namespace nes { namespace detail {
 	class SquareWaveChannel {
 	public:
 		SquareWaveChannel(uint16_t baseAddr, bool isChannel1)
-			: m_DutyTable(nullptr) // TORIAEZU: 設定する前に音ならす ROM があってぬるぽ触ってしまうようなら考える
+			: m_DutyTable(m_DutyTables[0]) // TORIAEZU: 設定する前に音ならす ROM があってぬるぽ触ってしまうようなら考える
 			, m_DecayLoop(false)
 			, m_LengthEnabled(false)
 			, m_DecayEnabled(false)
@@ -101,13 +102,22 @@ namespace nes { namespace detail {
 	private:
 		// 内部実装用メソッドたち
 		bool IsSweepForcingSilence();
+
+	private:
+		// テーブル
+		int m_DutyTables[4][8] = {
+			{0, 1, 0, 0, 0, 0, 0, 0},
+			{0, 1, 1, 0, 0, 0, 0, 0},
+			{0, 1, 1, 1, 1, 0, 0, 0},
+			{1, 0, 0, 1, 1, 1, 1, 1},
+		};
 	};
 
 	// 各チャンネルを保持して音をならす APU クラス
 	// TODO: 各チャンネルを同一I/Fで扱えるようにする
 	class Apu {
 	public:
-		Apu()
+		Apu(detail::ApuBus* pApuBus)
 			: m_NextSeqPhase(0)
 			, m_SequencerCounter(0)
 			, m_SequencerMode(Mode_4Step)
@@ -117,6 +127,7 @@ namespace nes { namespace detail {
 			, m_SquareWaveChannel1(0x4000, true)
 			, m_SquareWaveChannel2(0x4004, false)
 			, m_OutputVal(0)
+			, m_pApuBus(pApuBus)
 		{}
 
 		// レジスタ 書き込み
@@ -149,6 +160,9 @@ namespace nes { namespace detail {
 
 		// 出力値
 		int m_OutputVal;
+
+		// バス(割り込み用)
+		detail::ApuBus* m_pApuBus;
 
 		// 各チャンネルたちを駆動するメソッド
 		void ClockQuarterFrame();

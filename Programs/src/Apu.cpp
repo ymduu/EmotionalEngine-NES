@@ -3,14 +3,8 @@
 #include <utility>
 #include "Apu.h"
 
-namespace {
-	int g_DutyTables[4][8] = {
-		{0, 1, 0, 0, 0, 0, 0, 0},
-		{0, 1, 1, 0, 0, 0, 0, 0},
-		{0, 1, 1, 1, 1, 0, 0, 0},
-		{1, 0, 0, 1, 1, 1, 1, 1},
-	};
 
+namespace {
 	int g_LengthTable[32] = { 0 };
 
 	// コンストラクタでグローバルなテーブルを初期化するイニシャライザ
@@ -55,7 +49,8 @@ namespace {
 	};
 	Initializer g_Initializer;
 
-	constexpr int ClocksToNextSequence = 7457;
+	// 7457 分周 == [0, 7457) のカウンタをつかう
+	constexpr int ClocksToNextSequence = 7456;
 }
 
 namespace nes { namespace detail {
@@ -65,7 +60,7 @@ namespace nes { namespace detail {
 
 		switch (offset) {
 		case 0 :
-			m_DutyTable = g_DutyTables[value >> 6];
+			m_DutyTable = m_DutyTables[value >> 6];
 			m_DecayLoop = (value >> 5) & 1;
 			m_LengthEnabled = !m_DecayLoop;
 			m_DecayEnabled = ((value >> 4) & 1) == 0;
@@ -352,7 +347,8 @@ namespace nes { namespace detail {
 					ClockHalfFrame();
 				}
 				if (isRaiseIrq) {
-					// TODO: CpuBus を使って IRQ 割り込みを上げる
+					// TODO: CpuBus を使って IRQ 割り込みを上げる デバッグ
+					m_pApuBus->GenerateCpuInterrupt();
 					m_IrqPending = true;
 				}
 

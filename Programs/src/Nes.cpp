@@ -40,6 +40,7 @@ namespace nes {
 			m_ClockCount += dmaClk;
 			m_ClockCount += add;
 			finished = m_Ppu.Run(add * 3);
+			m_Apu.Run(add);
 			m_InstructionCount++;
 		}
 	}
@@ -52,6 +53,7 @@ namespace nes {
 		m_ClockCount += dmaClk;
 		m_ClockCount += add;
 		bool ret = m_Ppu.Run(add * 3);
+		m_Apu.Run(add);
 		m_InstructionCount++;
 
 		return ret;

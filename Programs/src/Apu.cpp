@@ -364,7 +364,15 @@ namespace nes { namespace detail {
 				// TODO: 他チャンネルをミックス
 			}
 
-			// TODO: 特定条件でコールバック関数で音を出力
+			// 40 or 41 クロックごとにコールバック関数で音を出力
+			if (m_AddWaveSampleCounter >= m_AddWaveSampleCounterMax) 
+			{
+				m_AddWaveSampleCounter = 0;
+				m_AddWaveSampleCounterMax == 40 ? 41 : 40;
+				m_pAddWaveSample(m_OutputVal);
+			}
+
+			m_AddWaveSampleCounter++;
 
 			m_CpuClock++;
 		}

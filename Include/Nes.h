@@ -4,6 +4,7 @@
 #include <cassette.h>
 #include <Cpu.h>
 #include <Ppu.h>
+#include <Apu.h>
 #include <System.h>
 #include <Nes_Pad.h>
 
@@ -18,7 +19,11 @@ namespace nes {
 	struct EmuInfo {
 		// ŽG‚É‹K’è’l‚ð“n‚µ‚Ä‚¨‚­
 		EmuInfo()
-			:CpuInfo(0, 0, 0, 0, 0, 0, detail::Instruction(detail::Opcode::ADC, detail::AddressingMode::Immediate, 0, 0), 0, 0)
+			: CpuInfo(0, 0, 0, 0, 0, 0, detail::Instruction(detail::Opcode::ADC, detail::AddressingMode::Immediate, 0, 0), 0, 0)
+			, PpuLines(0)
+			, PpuCycles(0)
+			, CpuCycles(0)
+			, CpuInstructionCount(0)
 		{}
 
 		detail::CpuInfo CpuInfo;
@@ -31,12 +36,12 @@ namespace nes {
 
 	class Emulator {
 	public:
-		Emulator(std::shared_ptr<uint8_t[]> rom, size_t romSize)
+		Emulator(std::shared_ptr<uint8_t[]> rom, size_t romSize, AddWaveSampleFunc pAddWaveSampleFunc)
 			:m_Rom(rom)
 			,m_System(m_Rom.get(), romSize)
 			,m_PpuBus(&m_System, &m_PpuSystem)
 			,m_Ppu(&m_PpuBus)
-			,m_Apu(&m_ApuBus)
+			,m_Apu(&m_ApuBus, pAddWaveSampleFunc)
 			,m_CpuBus(&m_System, &m_Ppu, &m_Apu)
 			,m_Cpu(&m_CpuBus)
 			,m_ClockCount(7)

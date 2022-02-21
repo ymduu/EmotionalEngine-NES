@@ -3,6 +3,10 @@
 #include "Nes.h"
 
 namespace {
+	// NES の画面サイズ
+	const int NesGraphicWidth = 256;
+	const int NesGraphicHeight = 240;
+
 	// HELLO WORLD する ROM 読み込む
 	void ReadRom(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
 	{
@@ -22,6 +26,7 @@ namespace {
 	void DrawEmulatedPicture(int softImage, nes::Color result[][256])
 	{
 		BYTE* p = (BYTE*)GetImageAddressSoftImage(softImage);
+		const int OffsetX = 64;
 
 		for (int y = 0; y < 240 * 2; y++) {
 			for (int x = 0; x < 256 * 2; x++) {
@@ -36,7 +41,7 @@ namespace {
 			}
 		}
 
-		DrawSoftImage(0, 0, softImage);
+		DrawSoftImage(OffsetX, 0, softImage);
 		//DrawSoftImage(256, 0, softImage);
 		//DrawSoftImage(0, 240, softImage);
 		//DrawSoftImage(256, 240, softImage);
@@ -121,6 +126,41 @@ namespace {
 			emu->ReleaseButton(nes::PadId::Zero, nes::PadButton::START);
 		}
 	}
+
+	// Player のハンドル(サウンド)
+	int g_SoftSoundPlayerHandle = -1;
+	// サンプリング周波数 44100 Hz
+	const int SamplingFreq = 44100;
+}
+
+void InitializeSound()
+{
+	// とりあえず、 チャンネル数:1 量子化ビット数:8bit サンプリング周波数:44KHz でやってみる
+	g_SoftSoundPlayerHandle = MakeSoftSoundPlayer1Ch8Bit44KHz();
+}
+
+void AddWaveSample(int sample) 
+{
+	// 3F ぶん
+	const int MaxSampleCount = SamplingFreq / 30;
+	static int skipSampleCount = 0;
+
+	int sampleCount = GetStockDataLengthSoftSoundPlayer(g_SoftSoundPlayerHandle);
+
+	if (sampleCount >= MaxSampleCount) 
+	{
+		skipSampleCount++;
+		skipSampleCount %= 80;
+
+		// あふれてたらサンプリングをちょっとへらす
+		if (skipSampleCount == 0) 
+		{
+			return;
+		}
+	}
+	// てきとう
+	sample *= 10;
+	AddOneDataSoftSoundPlayer(g_SoftSoundPlayerHandle, sample, sample);
 }
 
 // プログラムは WinMain から始まります
@@ -131,7 +171,7 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	size_t size;
 	ReadRom(&rom, &size);
 
-	nes::Emulator emu(rom, size);
+	nes::Emulator emu(rom, size, AddWaveSample);
 
 	if (ChangeWindowMode(true) != DX_CHANGESCREEN_OK) 
 	{
@@ -143,12 +183,13 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
         return -1 ;
     }
 
-    
+	InitializeSound();
+
 	// 描画バッファ
-	nes::Color result[240][256];
+	nes::Color result[NesGraphicHeight][NesGraphicWidth];
 
 	// dxlib で動的にイメージを描画するためにつかうやつ
-	auto softImage = MakeRGB8ColorSoftImage(256 * 2, 240 * 2);
+	auto softImage = MakeRGB8ColorSoftImage(NesGraphicWidth * 2, NesGraphicHeight * 2);
 
 	// 描画先を裏画面にする
 	SetDrawScreen(DX_SCREEN_BACK);
@@ -158,6 +199,21 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 		if (ProcessMessage() != 0) 
 		{ // メッセージ処理
 			break;//ウィンドウの×ボタンが押されたらループを抜ける
+		}
+
+		// 音 スタート
+		if (CheckStartSoftSoundPlayer(g_SoftSoundPlayerHandle) == FALSE) 
+		{
+			StartSoftSoundPlayer(g_SoftSoundPlayerHandle);
+		}
+
+		nes::EmuInfo info;
+		emu.GetEmuInfo(&info);
+		if (info.CpuCycles % 50 == 0) {
+			clsDx();
+			int sampleCount = GetStockDataLengthSoftSoundPlayer(g_SoftSoundPlayerHandle);
+			// 書き変わらない場所に printfDx するとなぜか残像が見えるので雑に NES の画面に被るように溜まってるサンプル数を出しとく(最悪)
+			printfDx("       %d samples\n", sampleCount);
 		}
 
 		InputKey(&emu);

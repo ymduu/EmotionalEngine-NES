@@ -4,6 +4,11 @@
 #include "constants.h"
 #include "System.h"
 
+namespace nes {
+	// APU クラスに注入する wav のサンプルを再生キューに入れる関数ポインタ
+	typedef void (*AddWaveSampleFunc)(int);
+}
+
 namespace nes { namespace detail {
 	class CpuBus;
 	class ApuBus;
@@ -117,7 +122,7 @@ namespace nes { namespace detail {
 	// TODO: 各チャンネルを同一I/Fで扱えるようにする
 	class Apu {
 	public:
-		Apu(detail::ApuBus* pApuBus)
+		Apu(detail::ApuBus* pApuBus, AddWaveSampleFunc pAddWaveSampleFunc)
 			: m_NextSeqPhase(0)
 			, m_SequencerCounter(0)
 			, m_SequencerMode(Mode_4Step)
@@ -128,6 +133,9 @@ namespace nes { namespace detail {
 			, m_SquareWaveChannel2(0x4004, false)
 			, m_OutputVal(0)
 			, m_pApuBus(pApuBus)
+			, m_pAddWaveSample(pAddWaveSampleFunc)
+			, m_AddWaveSampleCounter(0)
+			, m_AddWaveSampleCounterMax(40)
 		{}
 
 		// レジスタ 書き込み
@@ -174,6 +182,10 @@ namespace nes { namespace detail {
 		// m_NextSeqPhase を mod Phase数 を考慮しつつ 1進める
 		void StepSeqPhase();
 
+		//  wave のサンプルを追加するコールバック
+		AddWaveSampleFunc m_pAddWaveSample;
+		int m_AddWaveSampleCounter;
+		int m_AddWaveSampleCounterMax;
 	};
 
 }}

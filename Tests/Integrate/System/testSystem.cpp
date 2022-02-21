@@ -65,8 +65,10 @@ void TestSystem_ReadWrite()
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
     nes::detail::Ppu ppu(&ppuBus);
+    nes::detail::ApuBus apuBus;
+    nes::detail::Apu apu(&apuBus);
 
-    nes::detail::CpuBus bus(&sys, &ppu);
+    nes::detail::CpuBus bus(&sys, &ppu, &apu);
 
     // WRAM “Ç‚İ‘‚«‚Å‚«‚é
     // ‰Šú’l‚Í 0
@@ -110,7 +112,9 @@ void TestSystem_HelloWorld()
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
     nes::detail::Ppu ppu(&ppuBus);
-    nes::detail::CpuBus cpuBus(&sys, &ppu);
+    nes::detail::ApuBus apuBus;
+    nes::detail::Apu apu(&apuBus);
+    nes::detail::CpuBus cpuBus(&sys, &ppu, &apu);
 
     nes::detail::Cpu cpu(&cpuBus);
     ppuBus.Initialize(&cpu);
@@ -151,7 +155,9 @@ void TestSystem_HelloWorld_Cpu_Ppu()
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
     nes::detail::Ppu ppu(&ppuBus);
-    nes::detail::CpuBus cpuBus(&sys, &ppu);
+    nes::detail::ApuBus apuBus;
+    nes::detail::Apu apu(&apuBus);
+    nes::detail::CpuBus cpuBus(&sys, &ppu, &apu);
 
     nes::detail::Cpu cpu(&cpuBus);
     ppuBus.Initialize(&cpu);
@@ -223,7 +229,9 @@ void CreateTestCase_TestSystem_HelloWorld_Cpu_Ppu()
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
     nes::detail::Ppu ppu(&ppuBus);
-    nes::detail::CpuBus cpuBus(&sys, &ppu);
+    nes::detail::ApuBus apuBus;
+    nes::detail::Apu apu(&apuBus);
+    nes::detail::CpuBus cpuBus(&sys, &ppu, &apu);
 
     nes::detail::Cpu cpu(&cpuBus);
     ppuBus.Initialize(&cpu);
@@ -288,7 +296,9 @@ void TestSystem_NesTest()
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
     nes::detail::Ppu ppu(&ppuBus);
-    nes::detail::CpuBus cpuBus(&sys, &ppu);
+    nes::detail::ApuBus apuBus;
+    nes::detail::Apu apu(&apuBus);
+    nes::detail::CpuBus cpuBus(&sys, &ppu, &apu);
 
     nes::detail::Cpu cpu(&cpuBus);
     ppuBus.Initialize(&cpu);

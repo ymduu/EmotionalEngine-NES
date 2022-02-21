@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include <cassert>
 #include "constants.h"
 #include "Ppu.h"
 #include "System.h"

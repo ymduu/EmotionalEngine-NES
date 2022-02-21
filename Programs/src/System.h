@@ -6,12 +6,15 @@
 #include "Cpu.h"
 #include "Pad.h"
 #include "Ppu.h"
+#include "Apu.h"
 
 namespace nes { namespace detail {
 	class CpuBus;
 	class PpuBus;
+	class ApuBus;
 	class Ppu;
 	class Cpu;
+	class Apu;
 
 
 	// PPU のメモリ空間から参照される、名前が若干ややこしい(というかミスってる)が、要するに VRAM
@@ -69,9 +72,10 @@ namespace nes { namespace detail {
 	// System へのポインタを持ち、CPU から見えるメモリ空間に基づいてアクセスするクラス
 	class CpuBus {
 	public:
-		CpuBus(System* pSystem, Ppu* pPpu)
+		CpuBus(System* pSystem, Ppu* pPpu, Apu* pApu)
 			:m_pSystem(pSystem)
 			,m_pPpu(pPpu)
+			,m_pApu(pApu)
 			,m_IsDmaRunning(false)
 			,m_DmaUpperSrcAddr(0)
 		{}
@@ -88,6 +92,7 @@ namespace nes { namespace detail {
 	private:
 		System* m_pSystem;
 		Ppu* m_pPpu;
+		Apu* m_pApu;
 		// DMA は CpuBus が担う(実際の HW 構成もそうなっているはず。)
 		bool m_IsDmaRunning;
 		uint8_t m_DmaUpperSrcAddr;
@@ -101,6 +106,8 @@ namespace nes { namespace detail {
 		PpuBus(System* pSystem, PpuSystem* pPpuSystem)
 			:m_pSystem(pSystem)
 			,m_pPpuSystem(pPpuSystem)
+			,m_pCpu(nullptr)
+			,m_IsInitialized(false)
 		{}
 		uint8_t ReadByte(uint16_t addr);
 		// パレットテーブルの "下"にある nametableのミラーが PPU の内部バッファに読まれるのでそれに対応する
@@ -116,6 +123,22 @@ namespace nes { namespace detail {
 
 		System* m_pSystem;
 		PpuSystem* m_pPpuSystem;
+		// CPU にバスを繋ぐ
+		Cpu* m_pCpu;
+		bool m_IsInitialized;
+	};
+
+	class ApuBus {
+	public:
+		ApuBus()
+			: m_pCpu(nullptr)
+			, m_IsInitialized(false)
+		{}
+		// オブジェクト生成時の循環依存を切るため、 Initialize で Cpu へのポインタを渡す
+		void Initialize(Cpu* pCpu);
+		// フレームシーケンサが CPU に IRQ いれる
+		void GenerateCpuInterrupt();
+	private:
 		// CPU にバスを繋ぐ
 		Cpu* m_pCpu;
 		bool m_IsInitialized;

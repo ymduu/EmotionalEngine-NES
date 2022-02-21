@@ -67,10 +67,14 @@ namespace nes { namespace detail {
 		else if (addr < CASSETTE_BASE) 
 		{
 			size_t idx = addr - APU_IO_REG_BASE;
-			// TODO: APU 実装
 
+			// APU
+			if (addr == 0x4015) 
+			{
+				return m_pApu->ReadRegister4015();
+			}
 			// Pad
-			if (addr == 0x4016)
+			else if (addr == 0x4016)
 			{
 				return m_pSystem->m_Pads[0].ReadPad();
 			}
@@ -140,9 +144,22 @@ namespace nes { namespace detail {
 		else if (addr < CASSETTE_BASE)
 		{
 			size_t idx = addr - APU_IO_REG_BASE;
-			// TODO: PAD, APU 実装
-			// TORIAEZU: 疑似書き込みは残しておく(意味ないけど)
+			// TORIAEZU: 疑似書き込みは残しておく(意味ないけど、デバッグ用くらいに)
 			m_pSystem->m_IoReg[idx] = data;
+			
+			const int APU_CHANNEL_REG_MAX = 0x4013;
+			if (addr <= APU_CHANNEL_REG_MAX) 
+			{
+				// APU レジスタ書き込み
+				m_pApu->WriteRegister(data, addr);
+			}
+
+			// APU コントロールレジスタ
+			if (addr == 0x4015 || addr == 0x4017) 
+			{
+				m_pApu->WriteRegister(data, addr);
+			}
+
 			// DMA
 			if (addr == 0x4014)
 			{
@@ -152,10 +169,9 @@ namespace nes { namespace detail {
 			// Pad
 			if (addr == 0x4016)
 			{
+				// 4016 の書き込みで Pad 0 1 の setstrobe されるのが正しい？ メモ: https://taotao54321.hatenablog.com/entry/2017/04/11/011850
+				// 4017 書き込みは APU 制御なので。
 				m_pSystem->m_Pads[0].SetStrobe(static_cast<bool>(data & 1));
-			}
-			else if (addr == 0x4017)
-			{
 				m_pSystem->m_Pads[1].SetStrobe(static_cast<bool>(data & 1));
 			}
 		}
@@ -313,5 +329,18 @@ namespace nes { namespace detail {
 	{
 		m_DmaUpperSrcAddr = upperSrcAddr;
 		m_IsDmaRunning = true;
+	}
+
+	void ApuBus::Initialize(Cpu* pCpu)
+	{
+		m_pCpu = pCpu;
+		m_IsInitialized = true;
+	}
+
+	// フレームシーケンサが CPU に IRQ いれる
+	void ApuBus::GenerateCpuInterrupt()
+	{
+		assert(m_IsInitialized);
+		m_pCpu->Interrupt(nes::detail::InterruptType::IRQ);
 	}
 }}

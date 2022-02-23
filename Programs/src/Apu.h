@@ -118,6 +118,61 @@ namespace nes { namespace detail {
 		};
 	};
 
+	class TriangleWaveChannel {
+	public:
+		TriangleWaveChannel()
+			: m_LinearControl(false)
+			, m_LengthEnabled(false)
+			, m_LinearLoad(0)
+			, m_FreqTimer(0)
+			, m_LengthCounter(0)
+			, m_LinearReload(false)
+			, m_ChannelEnabled(false)
+			// 三角波チャンネルのベースアドレスは 0x4008 だけ
+			, m_BaseAddr(0x4008)
+			, m_FreqCounter(0)
+			, m_LinearCounter(0)
+			, m_TriStep(0)
+			, m_OutputVal(0)
+		{}
+
+		void WriteRegister(uint8_t value, uint16_t addr);
+		// APU 全体レジスタ($4015, $4017 の書き込みで反映される値)
+		void On4015Write(uint8_t value);
+		uint8_t GetStatusBit();
+
+		// 各 クロック(Apu クラスから呼び出すことを想定)
+		void ClockTimer();
+		void ClockQuarterFrame();
+		void ClockHalfFrame();
+
+		// 出力
+		int GetOutPut();
+
+	private:
+		// $4008
+		bool m_LinearControl;
+		bool m_LengthEnabled;
+		int  m_LinearLoad;
+
+		// $400A
+		int m_FreqTimer;
+
+		// $400B
+		int m_LengthCounter;
+		bool m_LinearReload;
+		bool m_ChannelEnabled;
+
+		// その他
+		uint16_t m_BaseAddr;
+		int m_FreqCounter;
+		int m_LinearCounter;
+		int m_TriStep;
+
+		// 出力値
+		int m_OutputVal;
+	};
+
 	// 各チャンネルを保持して音をならす APU クラス
 	// TODO: 各チャンネルを同一I/Fで扱えるようにする
 	class Apu {
@@ -165,6 +220,8 @@ namespace nes { namespace detail {
 		// チャンネルたち
 		SquareWaveChannel m_SquareWaveChannel1;
 		SquareWaveChannel m_SquareWaveChannel2;
+
+		TriangleWaveChannel m_TriangleWaveChannel;
 
 		// 出力値
 		int m_OutputVal;

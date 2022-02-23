@@ -105,7 +105,17 @@ namespace nes { namespace detail {
 	void SquareWaveChannel::On4015Write(uint8_t value)
 	{
 		// 最下位1bit
-		bool channelEnabled = value & 1;
+		bool channelEnabled = false;
+
+		if (m_IsChannel1) 
+		{
+			channelEnabled = value & 1;
+		}
+		else 
+		{
+			// 1(0-indexed)bit目
+			channelEnabled = (value >> 1) & 1;
+		}
 
 		m_ChannelEnabled = channelEnabled;
 		if (!m_ChannelEnabled) {
@@ -256,6 +266,161 @@ namespace nes { namespace detail {
 		}
 	}
 
+	// -------------------- 三角波 --------------------
+	void TriangleWaveChannel::WriteRegister(uint8_t value, uint16_t addr)
+	{
+		uint16_t offset = addr - m_BaseAddr;
+		switch (offset) {
+		case 0:
+			// $4008 の 7 bit 目は長さカウンタフラグ
+			m_LinearControl = ((value >> 7) & 1) == 1;
+			m_LengthEnabled = !m_LinearControl;
+			// 線形カウンタのロード値
+			m_LinearLoad = value & 0b1111111;
+			break;
+		case 1:
+			break;
+		case 2:
+			// $400A
+			// m_FreqTimer の上位3bitだけ残してクリア
+			m_FreqTimer &= 0b11100000000;
+			// m_FreqTimer の 下位8bitを更新
+			m_FreqTimer |= value;
+			break;
+		case 3:
+		{
+			// $400B
+			// m_FreqTimer の上位3 bit をクリア
+			m_FreqTimer &= 0b11111111;
+			uint16_t hi = value & 0b111;
+			m_FreqTimer |= (hi << 8);
+
+			// length Counter 更新
+			// 書き込み値の上位5bitが table のインデックス
+			int tableIndex = value & 0b11111000;
+			tableIndex >>= 3;
+
+			if (m_ChannelEnabled) 
+			{
+				m_LengthCounter = g_LengthTable[tableIndex];
+			}
+
+			m_LinearReload = true;
+			break;
+		}
+		default:
+			break;
+		}
+	}
+
+	void TriangleWaveChannel::On4015Write(uint8_t value)
+	{
+		// 2(0-indexed)bit目
+		bool channelEnabled = false;
+		channelEnabled = (value >> 2) & 1;
+
+		m_ChannelEnabled = channelEnabled;
+		if (!m_ChannelEnabled) 
+		{
+			m_LengthCounter = 0;
+		}
+	}
+
+	uint8_t TriangleWaveChannel::GetStatusBit()
+	{
+		return m_LengthCounter != 0 ? 1 : 0;
+	}
+
+	int TriangleWaveChannel::GetOutPut()
+	{
+		return m_OutputVal;
+	}
+
+	void TriangleWaveChannel::ClockTimer()
+	{
+		// タイマをクロック、その値によって三角波チャンネルをクロック
+		bool ultraSonic = false;
+
+		if (m_FreqTimer < 2 && m_FreqCounter == 0) 
+		{
+			ultraSonic = true;
+		}
+
+		bool clockTriUnit = true;
+
+		if (m_LengthCounter == 0) 
+		{
+			clockTriUnit = false;
+		}
+		if (m_LinearCounter == 0) 
+		{
+			clockTriUnit = false;
+		}
+		if (ultraSonic) 
+		{
+			clockTriUnit = false;
+		}
+
+		if (clockTriUnit) 
+		{
+			if (m_FreqCounter > 0) 
+			{
+				m_FreqCounter--;
+			}
+			else 
+			{
+				m_FreqCounter = m_FreqTimer;
+				// F E D C B A 9 8 7 6 5 4 3 2 1 0 0 1 2 3 4 5 6 7 8 9 A B C D E F のシーケンスを生成 するためのインデックスが m_TriStep
+				m_TriStep = (m_TriStep + 1) & 0x1F;
+			}
+		}
+
+		// TORIAEZU: ClockTimer の責務からは外れるが、三角波ユニットをクロックした直後の値で出力値を更新する
+		if (ultraSonic) 
+		{
+			// Disch の疑似コードでは 7.5 って言ってるけど[0, F]の中心で止める、という意味なので7でもいいはず
+			m_OutputVal = 7;
+		}
+		else if (m_TriStep & 0x10) 
+		{
+			// 0x10 のビットが立ってたら、そのビットを0にして、その下の4bitを反転することで F E D C B A 9 8 7 6 5 4 3 2 1 0 0 1 2 3 4 5 6 7 8 9 A B C D E F のシーケンスを生成
+			// cf. http://pgate1.at-ninja.jp/NES_on_FPGA/nes_apu.htm の 三角波 のとこ
+			m_OutputVal = m_TriStep ^ 0x1F;
+		}
+		else 
+		{
+			m_OutputVal = m_TriStep;
+		}
+	}
+
+	void TriangleWaveChannel::ClockQuarterFrame() 
+	{
+		// 線形カウンタの処理
+		if (m_LinearReload) 
+		{
+			// レジスタ$400Bへの書き込みによって、線形カウンタを停止し、カウンタへ音の長さをロードします(NES on FPGA)
+			m_LinearCounter = m_LinearLoad;
+		}
+		else if (m_LinearCounter > 0) 
+		{
+			// (線形カウンタのコントロールフラグ(http://pgate1.at-ninja.jp/NES_on_FPGA/nes_apu.htm)がクリアされてたら？) && カウンタが0でなければデクリメント
+			m_LinearCounter--;
+		}
+		if (!m_LinearControl) 
+		{
+			// TODO: 出典をしらべる
+			m_LinearReload = false;
+		}
+	}
+
+	void TriangleWaveChannel::ClockHalfFrame() 
+	{
+		// 長さカウンタのクロック生成
+		if (m_LengthEnabled && m_LengthCounter > 0) {
+			m_LengthCounter--;
+		}
+	}
+
 	void Apu::WriteRegister(uint8_t value, uint16_t addr)
 	{
 		// addr で各チャンネルに振り分け
@@ -269,11 +434,17 @@ namespace nes { namespace detail {
 			// 矩形波チャンネル2
 			m_SquareWaveChannel2.WriteRegister(value, addr);
 		}
+		else if (addr <= 0x400B) 
+		{
+			// 三角波
+			m_TriangleWaveChannel.WriteRegister(value, addr);
+		}
 		else if (addr == 0x4015) 
 		{
 			// 全チャンネルに書き込みを反映
 			m_SquareWaveChannel1.On4015Write(value);
 			m_SquareWaveChannel2.On4015Write(value);
+			m_TriangleWaveChannel.On4015Write(value);
 		}
 		else if (addr == 0x4017) 
 		{
@@ -307,6 +478,9 @@ namespace nes { namespace detail {
 		uint8_t square2 = m_SquareWaveChannel2.GetStatusBit();
 		res |= (square2 << 1);
 
+		uint8_t triangle = m_TriangleWaveChannel.GetStatusBit();
+		res |= (triangle << 2);
+
 		// TODO: 他チャンネルの status bit 取得 and res 更新
 
 		return res;
@@ -328,6 +502,9 @@ namespace nes { namespace detail {
 				m_SquareWaveChannel1.ClockTimer();
 				m_SquareWaveChannel2.ClockTimer();
 			}
+
+			// 三角波 は 1 CPU クロックごとにタイマーをクロック
+			m_TriangleWaveChannel.ClockTimer();
 
 			// clock frame sequencer
 			// フレームシーケンサは CPU クロックベースで動く
@@ -361,6 +538,7 @@ namespace nes { namespace detail {
 				m_OutputVal = 0;
 				m_OutputVal += m_SquareWaveChannel1.GetOutPut();
 				m_OutputVal += m_SquareWaveChannel2.GetOutPut();
+				m_OutputVal += m_TriangleWaveChannel.GetOutPut();
 				// TODO: 他チャンネルをミックス
 			}
 
@@ -446,10 +624,12 @@ namespace nes { namespace detail {
 	{
 		m_SquareWaveChannel1.ClockQuarterFrame();
 		m_SquareWaveChannel2.ClockQuarterFrame();
+		m_TriangleWaveChannel.ClockQuarterFrame();
 	}
 	void Apu::ClockHalfFrame() 
 	{
 		m_SquareWaveChannel1.ClockHalfFrame();
 		m_SquareWaveChannel2.ClockHalfFrame();
+		m_TriangleWaveChannel.ClockHalfFrame();
 	}
 }}

@@ -6,6 +6,7 @@
 
 namespace {
 	int g_LengthTable[32] = { 0 };
+	int g_NoiseFreqTable[16] = { 0 };
 
 	// コンストラクタでグローバルなテーブルを初期化するイニシャライザ
 	class Initializer {
@@ -45,6 +46,24 @@ namespace {
 			g_LengthTable[0b11011] = 0x1A;
 			g_LengthTable[0b11101] = 0x1C;
 			g_LengthTable[0b11111] = 0x1E;
+
+			// ノイズ、値のソースは NES on FPGA
+			g_NoiseFreqTable[0] = 0x004;
+			g_NoiseFreqTable[1] = 0x008;
+			g_NoiseFreqTable[2] = 0x010;
+			g_NoiseFreqTable[3] = 0x020;
+			g_NoiseFreqTable[4] = 0x040;
+			g_NoiseFreqTable[5] = 0x060;
+			g_NoiseFreqTable[6] = 0x080;
+			g_NoiseFreqTable[7] = 0x0A0;
+			g_NoiseFreqTable[8] = 0x0CA;
+			g_NoiseFreqTable[9] = 0x0FE;
+			g_NoiseFreqTable[10] = 0x17C;
+			g_NoiseFreqTable[11] = 0x1FC;
+			g_NoiseFreqTable[12] = 0x2FA;
+			g_NoiseFreqTable[13] = 0x3F8;
+			g_NoiseFreqTable[14] = 0x7F2;
+			g_NoiseFreqTable[15] = 0xFE4;
 		}
 	};
 	Initializer g_Initializer;
@@ -421,6 +440,179 @@ namespace nes { namespace detail {
 		}
 	}
 
+	void NoiseChannel::WriteRegister(uint8_t value, uint16_t addr)
+	{
+		uint16_t offset = addr - m_BaseAddr;
+
+		switch (offset) {
+		case 0:
+			// $400C
+			m_DecayLoop = (value >> 5) & 1;
+			m_LengthEnabled = !m_DecayLoop;
+			m_DecayEnabled = ((value >> 4) & 1) == 0;
+			m_DecayV = value & 0b1111;
+			break;
+		case 1:
+			break;
+		case 2:
+		{
+			// $400E
+			uint8_t idx = value & 0b1111;
+			m_FreqTimer = g_NoiseFreqTable[idx];
+			// m_FreqTimer = 0x40;
+
+			// ランダムモード生成フラグ
+			m_ShiftMode = (value >> 7) & 1;
+			break;
+		}
+		case 3:
+		{
+			if (m_ChannelEnabled) 
+			{
+				// length Counter 更新
+				// 書き込み値の上位5bitが table のインデックス
+				int tableIndex = value & 0b11111000;
+				tableIndex >>= 3;
+				m_LengthCounter = g_LengthTable[tableIndex];
+
+				m_DecayResetFlag = true;
+			}
+			break;
+		}
+		default:
+			break;
+		}
+	}
+
+	void NoiseChannel::ClockTimer() 
+	{
+		if (m_FreqCounter > 0) 
+		{
+			m_FreqCounter--;
+		}
+		else 
+		{
+			m_FreqCounter = m_FreqTimer;
+
+			// NES on FPGA:
+			// 15ビットシフトレジスタにはリセット時に1をセットしておく必要があります。 
+			// タイマによってシフトレジスタが励起されるたびに1ビット右シフトし、 ビット14には、ショートモード時にはビット0とビット6のEORを、 ロングモード時にはビット0とビット1のEORを入れます。
+			int topBit = 0;
+
+			if (m_ShiftMode) 
+			{
+				int shift6 = (m_NoiseShift >> 6) & 1;
+				int shift0 = m_NoiseShift & 1;
+
+				topBit = shift6 ^ shift0;
+			}
+			else 
+			{
+				int shift1 = (m_NoiseShift >> 1) & 1;
+				int shift0 = m_NoiseShift & 1;
+
+				topBit = shift1 ^ shift0;
+			}
+
+			// topBit を 15 bit目(0-indexed) にいれる
+			m_NoiseShift &= ~(1 << 15);
+			m_NoiseShift |= (topBit << 15);
+
+			m_NoiseShift >>= 1;
+		}
+
+		// ClockTimer は 1 APU クロックごとに呼び出されるので出力値の決定もここでやる
+		// シフトレジスタのビット0が1なら、チャンネルの出力は0となります。(NES on FPGA)
+		// 長さカウンタが0でない ⇔ channel active
+		if ((m_NoiseShift & 1) == 0 && m_LengthCounter != 0)
+		{
+			if (m_DecayEnabled) 
+			{
+				m_Output = m_DecayHiddenVol;
+			}
+			else 
+			{
+				m_Output = m_DecayV;
+			}
+		}
+		else 
+		{
+			m_Output = 0;
+		}
+	}
+
+	void NoiseChannel::ClockQuarterFrame()
+	{
+		// 矩形波のコピペだけど、共通化するのも違う気がするのでコピペのまま……
+		// フレームシーケンサによって励起されるとき、 最後のクロック以降チャンネルの4番目のレジスタへの書き込みがあった場合、 カウンタへ$Fをセットし、分周器へエンベロープ周期をセットします
+		if (m_DecayResetFlag) 
+		{
+			m_DecayResetFlag = false;
+			m_DecayHiddenVol = 0xf;
+
+			// decay_counter == エンベロープ周期(分周器でつかうもの)
+			// この if にはいるときの1回 + else の時が dacay_V 回なので、周期は decay_v+1になるよね(NES on FPGA)
+			m_DecayCounter = m_DecayV;
+		}
+		else 
+		{
+			// そうでなければ、分周器を励起します。
+			// カウンタ = decay_hidden_vol であってる？(たぶんあってると思う)
+			// 特定条件でカウンタの値が volume になるからこの名前なのかも。
+			if (m_DecayCounter > 0) 
+			{
+				m_DecayCounter--;
+			}
+			else 
+			{
+				m_DecayCounter = m_DecayV;
+				// 分周器が励起されるとき、カウンタがゼロでなければデクリメントします
+				if (m_DecayHiddenVol > 0) 
+				{
+					m_DecayHiddenVol--;
+				}
+				else if (m_DecayLoop) 
+				{
+					// カウンタが0で、ループフラグがセットされているならカウンタへ$Fをセットします。
+					m_DecayHiddenVol = 0xf;
+				}
+			}
+		}
+	}
+
+	void NoiseChannel::ClockHalfFrame()
+	{
+		// 矩形波とちがってスイープユニットはない
+		// 長さカウンタのクロック生成(NES on FPGA の l)
+		if (m_LengthEnabled && m_LengthCounter > 0) 
+		{
+			m_LengthCounter--;
+		}
+	}
+
+	int NoiseChannel::GetOutPut() 
+	{
+		return m_Output;
+	}
+
+	void NoiseChannel::On4015Write(uint8_t value)
+	{
+		// 3(0-indexed)bit目
+		bool channelEnabled = false;
+		channelEnabled = (value >> 3) & 1;
+
+		m_ChannelEnabled = channelEnabled;
+		if (!m_ChannelEnabled) 
+		{
+			m_LengthCounter = 0;
+		}
+	}
+
+	uint8_t NoiseChannel::GetStatusBit()
+	{
+		return m_LengthCounter != 0 ? 1 : 0;
+	}
+
 	void Apu::WriteRegister(uint8_t value, uint16_t addr)
 	{
 		// addr で各チャンネルに振り分け
@@ -439,12 +631,18 @@ namespace nes { namespace detail {
 			// 三角波
 			m_TriangleWaveChannel.WriteRegister(value, addr);
 		}
+		else if (addr <= 0x400F) 
+		{
+			// ノイズ
+			m_NoiseChannel.WriteRegister(value, addr);
+		}
 		else if (addr == 0x4015) 
 		{
 			// 全チャンネルに書き込みを反映
 			m_SquareWaveChannel1.On4015Write(value);
 			m_SquareWaveChannel2.On4015Write(value);
 			m_TriangleWaveChannel.On4015Write(value);
+			m_NoiseChannel.On4015Write(value);
 		}
 		else if (addr == 0x4017) 
 		{
@@ -481,6 +679,9 @@ namespace nes { namespace detail {
 		uint8_t triangle = m_TriangleWaveChannel.GetStatusBit();
 		res |= (triangle << 2);
 
+		uint8_t noise = m_NoiseChannel.GetStatusBit();
+		res |= (noise << 3);
+
 		// TODO: 他チャンネルの status bit 取得 and res 更新
 
 		return res;
@@ -501,6 +702,7 @@ namespace nes { namespace detail {
 				// 1 APU サイクルごとに実行したい処理
 				m_SquareWaveChannel1.ClockTimer();
 				m_SquareWaveChannel2.ClockTimer();
+				m_NoiseChannel.ClockTimer();
 			}
 
 			// 三角波 は 1 CPU クロックごとにタイマーをクロック
@@ -539,6 +741,7 @@ namespace nes { namespace detail {
 				m_OutputVal += m_SquareWaveChannel1.GetOutPut();
 				m_OutputVal += m_SquareWaveChannel2.GetOutPut();
 				m_OutputVal += m_TriangleWaveChannel.GetOutPut();
+				m_OutputVal += m_NoiseChannel.GetOutPut();
 				// TODO: 他チャンネルをミックス
 			}
 
@@ -625,11 +828,13 @@ namespace nes { namespace detail {
 		m_SquareWaveChannel1.ClockQuarterFrame();
 		m_SquareWaveChannel2.ClockQuarterFrame();
 		m_TriangleWaveChannel.ClockQuarterFrame();
+		m_NoiseChannel.ClockQuarterFrame();
 	}
 	void Apu::ClockHalfFrame() 
 	{
 		m_SquareWaveChannel1.ClockHalfFrame();
 		m_SquareWaveChannel2.ClockHalfFrame();
 		m_TriangleWaveChannel.ClockHalfFrame();
+		m_NoiseChannel.ClockHalfFrame();
 	}
 }}

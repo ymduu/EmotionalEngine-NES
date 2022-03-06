@@ -173,6 +173,76 @@ namespace nes { namespace detail {
 		int m_OutputVal;
 	};
 
+	// ノイズチャンネル
+	class NoiseChannel {
+	public:
+		NoiseChannel()
+			: m_DecayLoop(false)
+			, m_LengthEnabled(false)
+			, m_DecayEnabled(false)
+			, m_DecayV(0)
+			, m_FreqTimer(0)
+			, m_ShiftMode(false)
+			, m_LengthCounter(0)
+			, m_DecayResetFlag(false)
+			, m_FreqCounter(0)
+			// 15ビットシフトレジスタにはリセット時に1をセットしておく必要があります。(エミュレータではとりあえず int にしてます)
+			, m_NoiseShift(1)
+			, m_DecayHiddenVol(0)
+			, m_DecayCounter(0)
+			// ノイズチャンネルのベースアドレスは0x400C
+			, m_BaseAddr(0x400C)
+			, m_ChannelEnabled(false)
+			, m_Output(0)
+		{}
+
+		void WriteRegister(uint8_t value, uint16_t addr);
+		// APU 全体レジスタ($4015, $4017 の書き込みで反映される値)
+		void On4015Write(uint8_t value);
+		uint8_t GetStatusBit();
+
+		// 各 クロック(Apu クラスから呼び出すことを想定)
+		void ClockTimer();
+		void ClockQuarterFrame();
+		void ClockHalfFrame();
+
+		// 出力
+		int GetOutPut();
+
+	private:
+		// $400C
+		// 矩形波チャンネルと同じだが、 duty 比は存在しない
+		bool m_DecayLoop;
+		bool m_LengthEnabled;
+		bool m_DecayEnabled;
+		int m_DecayV;
+
+		// $400E
+		int m_FreqTimer;
+		bool m_ShiftMode;
+
+		// $400F
+		int m_LengthCounter;
+		bool m_DecayResetFlag;
+
+		// その他
+		int m_FreqCounter;
+		int m_NoiseShift;
+
+		// Decay 用変数(矩形波とおなじ)
+		// 音量
+		int m_DecayHiddenVol;
+		// ボリューム/エンベロープ周期
+		int m_DecayCounter;
+
+		int m_BaseAddr;
+
+		bool m_ChannelEnabled;
+
+		// 出力値
+		int m_Output;
+	};
+
 	// 各チャンネルを保持して音をならす APU クラス
 	// TODO: 各チャンネルを同一I/Fで扱えるようにする
 	class Apu {
@@ -222,6 +292,8 @@ namespace nes { namespace detail {
 		SquareWaveChannel m_SquareWaveChannel2;
 
 		TriangleWaveChannel m_TriangleWaveChannel;
+
+		NoiseChannel m_NoiseChannel;
 
 		// 出力値
 		int m_OutputVal;

@@ -2,10 +2,13 @@
 #include <cassert>
 #include <utility>
 #include "Apu.h"
+#include "constants.h"
 
 
 namespace {
 	int g_LengthTable[32] = { 0 };
+	int g_NoiseFreqTable[16] = { 0 };
+	int g_DmcFreqTable[16] = { 0 };
 
 	// コンストラクタでグローバルなテーブルを初期化するイニシャライザ
 	class Initializer {
@@ -45,6 +48,42 @@ namespace {
 			g_LengthTable[0b11011] = 0x1A;
 			g_LengthTable[0b11101] = 0x1C;
 			g_LengthTable[0b11111] = 0x1E;
+
+			// ノイズ、値のソースは NES on FPGA
+			g_NoiseFreqTable[0] = 0x004;
+			g_NoiseFreqTable[1] = 0x008;
+			g_NoiseFreqTable[2] = 0x010;
+			g_NoiseFreqTable[3] = 0x020;
+			g_NoiseFreqTable[4] = 0x040;
+			g_NoiseFreqTable[5] = 0x060;
+			g_NoiseFreqTable[6] = 0x080;
+			g_NoiseFreqTable[7] = 0x0A0;
+			g_NoiseFreqTable[8] = 0x0CA;
+			g_NoiseFreqTable[9] = 0x0FE;
+			g_NoiseFreqTable[10] = 0x17C;
+			g_NoiseFreqTable[11] = 0x1FC;
+			g_NoiseFreqTable[12] = 0x2FA;
+			g_NoiseFreqTable[13] = 0x3F8;
+			g_NoiseFreqTable[14] = 0x7F2;
+			g_NoiseFreqTable[15] = 0xFE4;
+
+			// DMC、値のソースは以下略
+			g_DmcFreqTable[0] = 0x1AC;
+			g_DmcFreqTable[1] = 0x17C;
+			g_DmcFreqTable[2] = 0x154;
+			g_DmcFreqTable[3] = 0x140;
+			g_DmcFreqTable[4] = 0x11E;
+			g_DmcFreqTable[5] = 0x0FE;
+			g_DmcFreqTable[6] = 0x0E2;
+			g_DmcFreqTable[7] = 0x0D6;
+			g_DmcFreqTable[8] = 0x0BE;
+			g_DmcFreqTable[9] = 0x0A0;
+			g_DmcFreqTable[0xA] = 0x08E;
+			g_DmcFreqTable[0xB] = 0x080;
+			g_DmcFreqTable[0xC] = 0x06A;
+			g_DmcFreqTable[0xD] = 0x054;
+			g_DmcFreqTable[0xE] = 0x048;
+			g_DmcFreqTable[0xF] = 0x036;
 		}
 	};
 	Initializer g_Initializer;
@@ -105,7 +144,17 @@ namespace nes { namespace detail {
 	void SquareWaveChannel::On4015Write(uint8_t value)
 	{
 		// 最下位1bit
-		bool channelEnabled = value & 1;
+		bool channelEnabled = false;
+
+		if (m_IsChannel1) 
+		{
+			channelEnabled = value & 1;
+		}
+		else 
+		{
+			// 1(0-indexed)bit目
+			channelEnabled = (value >> 1) & 1;
+		}
 
 		m_ChannelEnabled = channelEnabled;
 		if (!m_ChannelEnabled) {
@@ -256,6 +305,472 @@ namespace nes { namespace detail {
 		}
 	}
 
+	// -------------------- 三角波 --------------------
+	void TriangleWaveChannel::WriteRegister(uint8_t value, uint16_t addr)
+	{
+		uint16_t offset = addr - m_BaseAddr;
+		switch (offset) {
+		case 0:
+			// $4008 の 7 bit 目は長さカウンタフラグ
+			m_LinearControl = ((value >> 7) & 1) == 1;
+			m_LengthEnabled = !m_LinearControl;
+			// 線形カウンタのロード値
+			m_LinearLoad = value & 0b1111111;
+			break;
+		case 1:
+			break;
+		case 2:
+			// $400A
+			// m_FreqTimer の上位3bitだけ残してクリア
+			m_FreqTimer &= 0b11100000000;
+			// m_FreqTimer の 下位8bitを更新
+			m_FreqTimer |= value;
+			break;
+		case 3:
+		{
+			// $400B
+			// m_FreqTimer の上位3 bit をクリア
+			m_FreqTimer &= 0b11111111;
+			uint16_t hi = value & 0b111;
+			m_FreqTimer |= (hi << 8);
+
+			// length Counter 更新
+			// 書き込み値の上位5bitが table のインデックス
+			int tableIndex = value & 0b11111000;
+			tableIndex >>= 3;
+
+			if (m_ChannelEnabled) 
+			{
+				m_LengthCounter = g_LengthTable[tableIndex];
+			}
+
+			m_LinearReload = true;
+			break;
+		}
+		default:
+			break;
+		}
+	}
+
+	void TriangleWaveChannel::On4015Write(uint8_t value)
+	{
+		// 2(0-indexed)bit目
+		bool channelEnabled = false;
+		channelEnabled = (value >> 2) & 1;
+
+		m_ChannelEnabled = channelEnabled;
+		if (!m_ChannelEnabled) 
+		{
+			m_LengthCounter = 0;
+		}
+	}
+
+	uint8_t TriangleWaveChannel::GetStatusBit()
+	{
+		return m_LengthCounter != 0 ? 1 : 0;
+	}
+
+	int TriangleWaveChannel::GetOutPut()
+	{
+		return m_OutputVal;
+	}
+
+	void TriangleWaveChannel::ClockTimer()
+	{
+		// タイマをクロック、その値によって三角波チャンネルをクロック
+		bool ultraSonic = false;
+
+		if (m_FreqTimer < 2 && m_FreqCounter == 0) 
+		{
+			ultraSonic = true;
+		}
+
+		bool clockTriUnit = true;
+
+		if (m_LengthCounter == 0) 
+		{
+			clockTriUnit = false;
+		}
+		if (m_LinearCounter == 0) 
+		{
+			clockTriUnit = false;
+		}
+		if (ultraSonic) 
+		{
+			clockTriUnit = false;
+		}
+
+		if (clockTriUnit) 
+		{
+			if (m_FreqCounter > 0) 
+			{
+				m_FreqCounter--;
+			}
+			else 
+			{
+				m_FreqCounter = m_FreqTimer;
+				// F E D C B A 9 8 7 6 5 4 3 2 1 0 0 1 2 3 4 5 6 7 8 9 A B C D E F のシーケンスを生成 するためのインデックスが m_TriStep
+				m_TriStep = (m_TriStep + 1) & 0x1F;
+			}
+		}
+
+		// TORIAEZU: ClockTimer の責務からは外れるが、三角波ユニットをクロックした直後の値で出力値を更新する
+		if (ultraSonic) 
+		{
+			// Disch の疑似コードでは 7.5 って言ってるけど[0, F]の中心で止める、という意味なので7でもいいはず
+			m_OutputVal = 7;
+		}
+		else if (m_TriStep & 0x10) 
+		{
+			// 0x10 のビットが立ってたら、そのビットを0にして、その下の4bitを反転することで F E D C B A 9 8 7 6 5 4 3 2 1 0 0 1 2 3 4 5 6 7 8 9 A B C D E F のシーケンスを生成
+			// cf. http://pgate1.at-ninja.jp/NES_on_FPGA/nes_apu.htm の 三角波 のとこ
+			m_OutputVal = m_TriStep ^ 0x1F;
+		}
+		else 
+		{
+			m_OutputVal = m_TriStep;
+		}
+	}
+
+	void TriangleWaveChannel::ClockQuarterFrame() 
+	{
+		// 線形カウンタの処理
+		if (m_LinearReload) 
+		{
+			// レジスタ$400Bへの書き込みによって、線形カウンタを停止し、カウンタへ音の長さをロードします(NES on FPGA)
+			m_LinearCounter = m_LinearLoad;
+		}
+		else if (m_LinearCounter > 0) 
+		{
+			// (線形カウンタのコントロールフラグ(http://pgate1.at-ninja.jp/NES_on_FPGA/nes_apu.htm)がクリアされてたら？) && カウンタが0でなければデクリメント
+			m_LinearCounter--;
+		}
+		if (!m_LinearControl) 
+		{
+			// TODO: 出典をしらべる
+			m_LinearReload = false;
+		}
+	}
+
+	void TriangleWaveChannel::ClockHalfFrame() 
+	{
+		// 長さカウンタのクロック生成
+		if (m_LengthEnabled && m_LengthCounter > 0) {
+			m_LengthCounter--;
+		}
+	}
+
+	void NoiseChannel::WriteRegister(uint8_t value, uint16_t addr)
+	{
+		uint16_t offset = addr - m_BaseAddr;
+
+		switch (offset) {
+		case 0:
+			// $400C
+			m_DecayLoop = (value >> 5) & 1;
+			m_LengthEnabled = !m_DecayLoop;
+			m_DecayEnabled = ((value >> 4) & 1) == 0;
+			m_DecayV = value & 0b1111;
+			break;
+		case 1:
+			break;
+		case 2:
+		{
+			// $400E
+			uint8_t idx = value & 0b1111;
+			m_FreqTimer = g_NoiseFreqTable[idx];
+			// m_FreqTimer = 0x40;
+
+			// ランダムモード生成フラグ
+			m_ShiftMode = (value >> 7) & 1;
+			break;
+		}
+		case 3:
+		{
+			if (m_ChannelEnabled) 
+			{
+				// length Counter 更新
+				// 書き込み値の上位5bitが table のインデックス
+				int tableIndex = value & 0b11111000;
+				tableIndex >>= 3;
+				m_LengthCounter = g_LengthTable[tableIndex];
+
+				m_DecayResetFlag = true;
+			}
+			break;
+		}
+		default:
+			break;
+		}
+	}
+
+	void NoiseChannel::ClockTimer() 
+	{
+		if (m_FreqCounter > 0) 
+		{
+			m_FreqCounter--;
+		}
+		else 
+		{
+			m_FreqCounter = m_FreqTimer;
+
+			// NES on FPGA:
+			// 15ビットシフトレジスタにはリセット時に1をセットしておく必要があります。 
+			// タイマによってシフトレジスタが励起されるたびに1ビット右シフトし、 ビット14には、ショートモード時にはビット0とビット6のEORを、 ロングモード時にはビット0とビット1のEORを入れます。
+			int topBit = 0;
+
+			if (m_ShiftMode) 
+			{
+				int shift6 = (m_NoiseShift >> 6) & 1;
+				int shift0 = m_NoiseShift & 1;
+
+				topBit = shift6 ^ shift0;
+			}
+			else 
+			{
+				int shift1 = (m_NoiseShift >> 1) & 1;
+				int shift0 = m_NoiseShift & 1;
+
+				topBit = shift1 ^ shift0;
+			}
+
+			// topBit を 15 bit目(0-indexed) にいれる
+			m_NoiseShift &= ~(1 << 15);
+			m_NoiseShift |= (topBit << 15);
+
+			m_NoiseShift >>= 1;
+		}
+
+		// ClockTimer は 1 APU クロックごとに呼び出されるので出力値の決定もここでやる
+		// シフトレジスタのビット0が1なら、チャンネルの出力は0となります。(NES on FPGA)
+		// 長さカウンタが0でない ⇔ channel active
+		if ((m_NoiseShift & 1) == 0 && m_LengthCounter != 0)
+		{
+			if (m_DecayEnabled) 
+			{
+				m_Output = m_DecayHiddenVol;
+			}
+			else 
+			{
+				m_Output = m_DecayV;
+			}
+		}
+		else 
+		{
+			m_Output = 0;
+		}
+	}
+
+	void NoiseChannel::ClockQuarterFrame()
+	{
+		// 矩形波のコピペだけど、共通化するのも違う気がするのでコピペのまま……
+		// フレームシーケンサによって励起されるとき、 最後のクロック以降チャンネルの4番目のレジスタへの書き込みがあった場合、 カウンタへ$Fをセットし、分周器へエンベロープ周期をセットします
+		if (m_DecayResetFlag) 
+		{
+			m_DecayResetFlag = false;
+			m_DecayHiddenVol = 0xf;
+
+			// decay_counter == エンベロープ周期(分周器でつかうもの)
+			// この if にはいるときの1回 + else の時が dacay_V 回なので、周期は decay_v+1になるよね(NES on FPGA)
+			m_DecayCounter = m_DecayV;
+		}
+		else 
+		{
+			// そうでなければ、分周器を励起します。
+			// カウンタ = decay_hidden_vol であってる？(たぶんあってると思う)
+			// 特定条件でカウンタの値が volume になるからこの名前なのかも。
+			if (m_DecayCounter > 0) 
+			{
+				m_DecayCounter--;
+			}
+			else 
+			{
+				m_DecayCounter = m_DecayV;
+				// 分周器が励起されるとき、カウンタがゼロでなければデクリメントします
+				if (m_DecayHiddenVol > 0) 
+				{
+					m_DecayHiddenVol--;
+				}
+				else if (m_DecayLoop) 
+				{
+					// カウンタが0で、ループフラグがセットされているならカウンタへ$Fをセットします。
+					m_DecayHiddenVol = 0xf;
+				}
+			}
+		}
+	}
+
+	void NoiseChannel::ClockHalfFrame()
+	{
+		// 矩形波とちがってスイープユニットはない
+		// 長さカウンタのクロック生成(NES on FPGA の l)
+		if (m_LengthEnabled && m_LengthCounter > 0) 
+		{
+			m_LengthCounter--;
+		}
+	}
+
+	int NoiseChannel::GetOutPut() 
+	{
+		return m_Output;
+	}
+
+	void NoiseChannel::On4015Write(uint8_t value)
+	{
+		// 3(0-indexed)bit目
+		bool channelEnabled = false;
+		channelEnabled = (value >> 3) & 1;
+
+		m_ChannelEnabled = channelEnabled;
+		if (!m_ChannelEnabled) 
+		{
+			m_LengthCounter = 0;
+		}
+	}
+
+	uint8_t NoiseChannel::GetStatusBit()
+	{
+		return m_LengthCounter != 0 ? 1 : 0;
+	}
+
+	void DmcChannel::WriteRegister(uint8_t value, uint16_t addr) 
+	{
+		uint16_t offset = addr - m_BaseAddr;
+
+		switch (offset) {
+		case 0:
+			m_DmcIrqEnabled = (value >> 7) & 1;
+			m_DmcLoop = (value >> 6) & 1;
+			m_FreqTimer = g_DmcFreqTable[value & 0b1111];
+			break;
+		case 1:
+			// デルタカウンタの初期値
+			m_Output = value & 0b01111111;
+			break;
+		case 2:
+			// DMCサンプリングを開始するとき、 アドレスカウンタにはレジスタ$4012 * $40 + $C000をセット(NES on FPGA)
+			m_AddrLoad = 0xC000 + static_cast<int>(value) * 0x40;
+			break;
+		case 3:
+			// 残りバイトカウンタにはレジスタ$4013 * $10 + 1をセットします(NES on FPGA)
+			m_LengthLoad = (static_cast<int>(value) * 0x10) + 1;
+			break;
+		default:
+			break;
+		}
+	}
+
+	void DmcChannel::On4015Write(uint8_t value)
+	{
+		if ((value >> 4) & 1) 
+		{
+			m_Length = m_LengthLoad;
+			m_Addr = m_AddrLoad;
+		}
+		else 
+		{
+			m_Length = 0;
+		}
+
+		// 割り込みクリア
+		m_DmcIrqPending = false;
+	}
+
+	void DmcChannel::GetStatusBit(uint8_t* pOutValue) 
+	{
+		uint8_t orValue = 0;
+		if (m_Length > 0) 
+		{
+			orValue |= (1 << 4);
+		}
+		if (m_DmcIrqPending) 
+		{
+			orValue |= (1 << 7);
+		}
+
+		*pOutValue |= orValue;
+	}
+
+	uint64_t DmcChannel::ClockTimer()
+	{
+		uint64_t retCpuClock = 0;
+
+		if (m_FreqCounter > 0) 
+		{
+			m_FreqCounter--;
+		}
+		else 
+		{
+			m_FreqCounter = m_FreqTimer;
+
+			if (!m_OutputUnitSilent) 
+			{
+				// サイレンスフラグがクリアされていたら
+				if ((m_OutputShift & 1) && m_Output < 0x7e) 
+				{
+					// デルタカウンタが 126 より小さいなら +2
+					m_Output += 2;
+				}
+				if (!(m_OutputShift & 1) && m_Output > 1) 
+				{
+					// デルタカウンタが 1 より大きいなら -2
+					m_Output -= 2;
+				}
+			}
+
+			// シフトレジスタに入っている使用済みサンプルを捨てる
+			m_BitsInOutputUnit--;
+			m_OutputShift >>= 1;
+
+			if (m_BitsInOutputUnit == 0) 
+			{
+				m_BitsInOutputUnit = 8;
+				m_OutputShift = m_SampleBuffer;
+				m_OutputUnitSilent = m_IsSampleBufferEmpty;
+				m_IsSampleBufferEmpty = true;
+			}
+
+			// 必要なら DMA する
+			if (m_Length > 0 && m_IsSampleBufferEmpty) 
+			{
+				retCpuClock = 4;
+
+				m_SampleBuffer = m_pApu->DmaReadFromCpu(m_Addr);
+				m_IsSampleBufferEmpty = false;
+
+				m_Addr++;
+				if (m_Addr > 0xFFFF) 
+				{
+					// 0xFFFF を超えてたら 0x8000 に丸める
+					m_Addr = 0x8000;
+				}
+
+				m_Length--;
+
+				if (m_Length == 0) 
+				{
+					if (m_DmcLoop) 
+					{
+						m_Length = m_LengthLoad;
+						m_Addr = m_AddrLoad;
+					}
+					else if (m_DmcIrqEnabled) 
+					{
+						m_DmcIrqPending = true;
+						m_pApu->GenerateCpuInterrupt();
+					}
+				}
+			}
+		}
+
+		return retCpuClock;
+	}
+
+	int DmcChannel::GetOutPut() 
+	{
+		return m_Output;
+	}
+
 	void Apu::WriteRegister(uint8_t value, uint16_t addr)
 	{
 		// addr で各チャンネルに振り分け
@@ -269,11 +784,29 @@ namespace nes { namespace detail {
 			// 矩形波チャンネル2
 			m_SquareWaveChannel2.WriteRegister(value, addr);
 		}
+		else if (addr <= 0x400B) 
+		{
+			// 三角波
+			m_TriangleWaveChannel.WriteRegister(value, addr);
+		}
+		else if (addr <= 0x400F) 
+		{
+			// ノイズ
+			m_NoiseChannel.WriteRegister(value, addr);
+		}
+		else if (addr <= 0x4013) 
+		{
+			// DMC
+			m_DmcChannel.WriteRegister(value, addr);
+		}
 		else if (addr == 0x4015) 
 		{
 			// 全チャンネルに書き込みを反映
 			m_SquareWaveChannel1.On4015Write(value);
 			m_SquareWaveChannel2.On4015Write(value);
+			m_TriangleWaveChannel.On4015Write(value);
+			m_NoiseChannel.On4015Write(value);
+			m_DmcChannel.On4015Write(value);
 		}
 		else if (addr == 0x4017) 
 		{
@@ -307,7 +840,14 @@ namespace nes { namespace detail {
 		uint8_t square2 = m_SquareWaveChannel2.GetStatusBit();
 		res |= (square2 << 1);
 
-		// TODO: 他チャンネルの status bit 取得 and res 更新
+		uint8_t triangle = m_TriangleWaveChannel.GetStatusBit();
+		res |= (triangle << 2);
+
+		uint8_t noise = m_NoiseChannel.GetStatusBit();
+		res |= (noise << 3);
+
+		// DMC だけは 1bit ではないので DMC 側に更新してもらう
+		m_DmcChannel.GetStatusBit(&res);
 
 		return res;
 	}
@@ -317,8 +857,10 @@ namespace nes { namespace detail {
 		return m_OutputVal;
 	}
 
-	void Apu::Run(uint64_t cpuClock) 
+	uint64_t Apu::Run(uint64_t cpuClock) 
 	{
+		uint64_t retCpuClock = 0;
+
 		// cpuClock ぶんだけ APU うごかす
 		for (int i = 0; i < cpuClock; i++) 
 		{
@@ -327,7 +869,12 @@ namespace nes { namespace detail {
 				// 1 APU サイクルごとに実行したい処理
 				m_SquareWaveChannel1.ClockTimer();
 				m_SquareWaveChannel2.ClockTimer();
+				m_NoiseChannel.ClockTimer();
 			}
+
+			// 三角波 と DMC は 1 CPU クロックごとにタイマーをクロック
+			m_TriangleWaveChannel.ClockTimer();
+			retCpuClock += m_DmcChannel.ClockTimer();
 
 			// clock frame sequencer
 			// フレームシーケンサは CPU クロックベースで動く
@@ -358,10 +905,14 @@ namespace nes { namespace detail {
 
 			// 出力値の決定 (1 APU クロックごと)
 			if (m_CpuClock % 2 == 0) {
+				// TODO: ちゃんとミックスする
 				m_OutputVal = 0;
 				m_OutputVal += m_SquareWaveChannel1.GetOutPut();
 				m_OutputVal += m_SquareWaveChannel2.GetOutPut();
-				// TODO: 他チャンネルをミックス
+				m_OutputVal += m_TriangleWaveChannel.GetOutPut();
+				m_OutputVal += m_NoiseChannel.GetOutPut();
+				// TORIAEZU: DMC だけ 7bit なのでほかと同じように4bitに丸める
+				m_OutputVal += (m_DmcChannel.GetOutPut() >> 3);
 			}
 
 			// 40 or 41 クロックごとにコールバック関数で音を出力
@@ -376,6 +927,8 @@ namespace nes { namespace detail {
 
 			m_CpuClock++;
 		}
+
+		return retCpuClock;
 	}
 
 	// https://wiki.nesdev.org/w/index.php/APU_Frame_Counter
@@ -446,10 +999,24 @@ namespace nes { namespace detail {
 	{
 		m_SquareWaveChannel1.ClockQuarterFrame();
 		m_SquareWaveChannel2.ClockQuarterFrame();
+		m_TriangleWaveChannel.ClockQuarterFrame();
+		m_NoiseChannel.ClockQuarterFrame();
 	}
 	void Apu::ClockHalfFrame() 
 	{
 		m_SquareWaveChannel1.ClockHalfFrame();
 		m_SquareWaveChannel2.ClockHalfFrame();
+		m_TriangleWaveChannel.ClockHalfFrame();
+		m_NoiseChannel.ClockHalfFrame();
+	}
+
+	uint8_t Apu::DmaReadFromCpu(int addr) 
+	{
+		return m_pApuBus->ReadByte(static_cast<uint16_t>(addr));
+	}
+
+	void Apu::GenerateCpuInterrupt() 
+	{
+		m_pApuBus->GenerateCpuInterrupt();
 	}
 }}

@@ -12,13 +12,17 @@ namespace {
 
 		auto nesFile = rootPath.value();
 		//nesFile += "/Tests/TestBinaries/helloworld/sample1/sample1.nes";
-		//nesFile += "/Tests/TestBinaries/nestest/nestest.nes";
+		nesFile += "/Tests/TestBinaries/nestest/nestest.nes";
 		//nesFile += "/Tests/TestBinaries/giko/giko011.nes";
 		//nesFile += "/Tests/TestBinaries/rom/donkey.nes";
-		nesFile += "/Tests/TestBinaries/rom/mario.nes";
+		// nesFile += "/Tests/TestBinaries/rom/mario.nes";
 
 		test::ReadFile(nesFile, pOutBuf, pOutSize);
 	}
+}
+
+void AddWaveSample(int sample)
+{
 }
 
 void Main()
@@ -28,7 +32,7 @@ void Main()
 	size_t size;
 	ReadHelloWorldNes(&rom, &size);
 
-	nes::Emulator emu(rom, size);
+	nes::Emulator emu(rom, size, AddWaveSample);
 
 	// window をファミコンサイズに
 	Window::Resize(Size(256, 240));

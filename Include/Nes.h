@@ -41,6 +41,7 @@ namespace nes {
 			,m_System(m_Rom.get(), romSize)
 			,m_PpuBus(&m_System, &m_PpuSystem)
 			,m_Ppu(&m_PpuBus)
+			,m_ApuBus(&m_System)
 			,m_Apu(&m_ApuBus, pAddWaveSampleFunc)
 			,m_CpuBus(&m_System, &m_Ppu, &m_Apu)
 			,m_Cpu(&m_CpuBus)

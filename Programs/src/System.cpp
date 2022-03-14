@@ -343,4 +343,18 @@ namespace nes { namespace detail {
 		assert(m_IsInitialized);
 		m_pCpu->Interrupt(nes::detail::InterruptType::IRQ);
 	}
+
+	// APU から DMA で CPU メモリ空間の値を読み込む
+	uint8_t ApuBus::ReadByte(uint16_t addr)
+	{
+		assert(m_IsInitialized);
+		// DMC 用 DMA
+		// $4012 書き込み時の挙動と wrap の挙動から、DMA で読むアドレスは $8000 以降(つまり、 PRG ROM しかよまない)のはず、 assert しとく
+		assert(addr >= CASSETTE_PRG_ROM_BASE);
+		int offset = addr - CASSETTE_PRG_ROM_BASE;
+
+		uint8_t res = 0;
+		m_pSystem->m_Cassette.ReadPrgRom(&res, offset, 1);
+		return res;
+	}
 }}

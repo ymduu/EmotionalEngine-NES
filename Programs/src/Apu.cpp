@@ -2,11 +2,13 @@
 #include <cassert>
 #include <utility>
 #include "Apu.h"
+#include "constants.h"
 
 
 namespace {
 	int g_LengthTable[32] = { 0 };
 	int g_NoiseFreqTable[16] = { 0 };
+	int g_DmcFreqTable[16] = { 0 };
 
 	// コンストラクタでグローバルなテーブルを初期化するイニシャライザ
 	class Initializer {
@@ -64,6 +66,24 @@ namespace {
 			g_NoiseFreqTable[13] = 0x3F8;
 			g_NoiseFreqTable[14] = 0x7F2;
 			g_NoiseFreqTable[15] = 0xFE4;
+
+			// DMC、値のソースは以下略
+			g_DmcFreqTable[0] = 0x1AC;
+			g_DmcFreqTable[1] = 0x17C;
+			g_DmcFreqTable[2] = 0x154;
+			g_DmcFreqTable[3] = 0x140;
+			g_DmcFreqTable[4] = 0x11E;
+			g_DmcFreqTable[5] = 0x0FE;
+			g_DmcFreqTable[6] = 0x0E2;
+			g_DmcFreqTable[7] = 0x0D6;
+			g_DmcFreqTable[8] = 0x0BE;
+			g_DmcFreqTable[9] = 0x0A0;
+			g_DmcFreqTable[0xA] = 0x08E;
+			g_DmcFreqTable[0xB] = 0x080;
+			g_DmcFreqTable[0xC] = 0x06A;
+			g_DmcFreqTable[0xD] = 0x054;
+			g_DmcFreqTable[0xE] = 0x048;
+			g_DmcFreqTable[0xF] = 0x036;
 		}
 	};
 	Initializer g_Initializer;
@@ -613,6 +633,144 @@ namespace nes { namespace detail {
 		return m_LengthCounter != 0 ? 1 : 0;
 	}
 
+	void DmcChannel::WriteRegister(uint8_t value, uint16_t addr) 
+	{
+		uint16_t offset = addr - m_BaseAddr;
+
+		switch (offset) {
+		case 0:
+			m_DmcIrqEnabled = (value >> 7) & 1;
+			m_DmcLoop = (value >> 6) & 1;
+			m_FreqTimer = g_DmcFreqTable[value & 0b1111];
+			break;
+		case 1:
+			// デルタカウンタの初期値
+			m_Output = value & 0b01111111;
+			break;
+		case 2:
+			// DMCサンプリングを開始するとき、 アドレスカウンタにはレジスタ$4012 * $40 + $C000をセット(NES on FPGA)
+			m_AddrLoad = 0xC000 + static_cast<int>(value) * 0x40;
+			break;
+		case 3:
+			// 残りバイトカウンタにはレジスタ$4013 * $10 + 1をセットします(NES on FPGA)
+			m_LengthLoad = (static_cast<int>(value) * 0x10) + 1;
+			break;
+		default:
+			break;
+		}
+	}
+
+	void DmcChannel::On4015Write(uint8_t value)
+	{
+		if ((value >> 4) & 1) 
+		{
+			m_Length = m_LengthLoad;
+			m_Addr = m_AddrLoad;
+		}
+		else 
+		{
+			m_Length = 0;
+		}
+
+		// 割り込みクリア
+		m_DmcIrqPending = false;
+	}
+
+	void DmcChannel::GetStatusBit(uint8_t* pOutValue) 
+	{
+		uint8_t orValue = 0;
+		if (m_Length > 0) 
+		{
+			orValue |= (1 << 4);
+		}
+		if (m_DmcIrqPending) 
+		{
+			orValue |= (1 << 7);
+		}
+
+		*pOutValue |= orValue;
+	}
+
+	uint64_t DmcChannel::ClockTimer()
+	{
+		uint64_t retCpuClock = 0;
+
+		if (m_FreqCounter > 0) 
+		{
+			m_FreqCounter--;
+		}
+		else 
+		{
+			m_FreqCounter = m_FreqTimer;
+
+			if (!m_OutputUnitSilent) 
+			{
+				// サイレンスフラグがクリアされていたら
+				if ((m_OutputShift & 1) && m_Output < 0x7e) 
+				{
+					// デルタカウンタが 126 より小さいなら +2
+					m_Output += 2;
+				}
+				if (!(m_OutputShift & 1) && m_Output > 1) 
+				{
+					// デルタカウンタが 1 より大きいなら -2
+					m_Output -= 2;
+				}
+			}
+
+			// シフトレジスタに入っている使用済みサンプルを捨てる
+			m_BitsInOutputUnit--;
+			m_OutputShift >>= 1;
+
+			if (m_BitsInOutputUnit == 0) 
+			{
+				m_BitsInOutputUnit = 8;
+				m_OutputShift = m_SampleBuffer;
+				m_OutputUnitSilent = m_IsSampleBufferEmpty;
+				m_IsSampleBufferEmpty = true;
+			}
+
+			// 必要なら DMA する
+			if (m_Length > 0 && m_IsSampleBufferEmpty) 
+			{
+				retCpuClock = 4;
+
+				m_SampleBuffer = m_pApu->DmaReadFromCpu(m_Addr);
+				m_IsSampleBufferEmpty = false;
+
+				m_Addr++;
+				if (m_Addr > 0xFFFF) 
+				{
+					// 0xFFFF を超えてたら 0x8000 に丸める
+					m_Addr = 0x8000;
+				}
+
+				m_Length--;
+
+				if (m_Length == 0) 
+				{
+					if (m_DmcLoop) 
+					{
+						m_Length = m_LengthLoad;
+						m_Addr = m_AddrLoad;
+					}
+					else if (m_DmcIrqEnabled) 
+					{
+						m_DmcIrqPending = true;
+						m_pApu->GenerateCpuInterrupt();
+					}
+				}
+			}
+		}
+
+		return retCpuClock;
+	}
+
+	int DmcChannel::GetOutPut() 
+	{
+		return m_Output;
+	}
+
 	void Apu::WriteRegister(uint8_t value, uint16_t addr)
 	{
 		// addr で各チャンネルに振り分け
@@ -636,6 +794,11 @@ namespace nes { namespace detail {
 			// ノイズ
 			m_NoiseChannel.WriteRegister(value, addr);
 		}
+		else if (addr <= 0x4013) 
+		{
+			// DMC
+			m_DmcChannel.WriteRegister(value, addr);
+		}
 		else if (addr == 0x4015) 
 		{
 			// 全チャンネルに書き込みを反映
@@ -643,6 +806,7 @@ namespace nes { namespace detail {
 			m_SquareWaveChannel2.On4015Write(value);
 			m_TriangleWaveChannel.On4015Write(value);
 			m_NoiseChannel.On4015Write(value);
+			m_DmcChannel.On4015Write(value);
 		}
 		else if (addr == 0x4017) 
 		{
@@ -682,7 +846,8 @@ namespace nes { namespace detail {
 		uint8_t noise = m_NoiseChannel.GetStatusBit();
 		res |= (noise << 3);
 
-		// TODO: 他チャンネルの status bit 取得 and res 更新
+		// DMC だけは 1bit ではないので DMC 側に更新してもらう
+		m_DmcChannel.GetStatusBit(&res);
 
 		return res;
 	}
@@ -692,8 +857,10 @@ namespace nes { namespace detail {
 		return m_OutputVal;
 	}
 
-	void Apu::Run(uint64_t cpuClock) 
+	uint64_t Apu::Run(uint64_t cpuClock) 
 	{
+		uint64_t retCpuClock = 0;
+
 		// cpuClock ぶんだけ APU うごかす
 		for (int i = 0; i < cpuClock; i++) 
 		{
@@ -705,8 +872,9 @@ namespace nes { namespace detail {
 				m_NoiseChannel.ClockTimer();
 			}
 
-			// 三角波 は 1 CPU クロックごとにタイマーをクロック
+			// 三角波 と DMC は 1 CPU クロックごとにタイマーをクロック
 			m_TriangleWaveChannel.ClockTimer();
+			retCpuClock += m_DmcChannel.ClockTimer();
 
 			// clock frame sequencer
 			// フレームシーケンサは CPU クロックベースで動く
@@ -737,12 +905,14 @@ namespace nes { namespace detail {
 
 			// 出力値の決定 (1 APU クロックごと)
 			if (m_CpuClock % 2 == 0) {
+				// TODO: ちゃんとミックスする
 				m_OutputVal = 0;
 				m_OutputVal += m_SquareWaveChannel1.GetOutPut();
 				m_OutputVal += m_SquareWaveChannel2.GetOutPut();
 				m_OutputVal += m_TriangleWaveChannel.GetOutPut();
 				m_OutputVal += m_NoiseChannel.GetOutPut();
-				// TODO: 他チャンネルをミックス
+				// TORIAEZU: DMC だけ 7bit なのでほかと同じように4bitに丸める
+				m_OutputVal += (m_DmcChannel.GetOutPut() >> 3);
 			}
 
 			// 40 or 41 クロックごとにコールバック関数で音を出力
@@ -757,6 +927,8 @@ namespace nes { namespace detail {
 
 			m_CpuClock++;
 		}
+
+		return retCpuClock;
 	}
 
 	// https://wiki.nesdev.org/w/index.php/APU_Frame_Counter
@@ -836,5 +1008,15 @@ namespace nes { namespace detail {
 		m_SquareWaveChannel2.ClockHalfFrame();
 		m_TriangleWaveChannel.ClockHalfFrame();
 		m_NoiseChannel.ClockHalfFrame();
+	}
+
+	uint8_t Apu::DmaReadFromCpu(int addr) 
+	{
+		return m_pApuBus->ReadByte(static_cast<uint16_t>(addr));
+	}
+
+	void Apu::GenerateCpuInterrupt() 
+	{
+		m_pApuBus->GenerateCpuInterrupt();
 	}
 }}

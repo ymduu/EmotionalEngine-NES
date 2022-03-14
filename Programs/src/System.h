@@ -39,6 +39,7 @@ namespace nes { namespace detail {
 	class System {
 		friend detail::CpuBus;
 		friend detail::PpuBus;
+		friend detail::ApuBus;
 	public:
 		// TORIAEZU: カセットの内容はコンストラクタで受け取る
 		System(uint8_t* pBuffer, size_t bufferSize)
@@ -130,17 +131,22 @@ namespace nes { namespace detail {
 
 	class ApuBus {
 	public:
-		ApuBus()
+		ApuBus(System* pSystem)
 			: m_pCpu(nullptr)
+			, m_pSystem(pSystem)
 			, m_IsInitialized(false)
 		{}
 		// オブジェクト生成時の循環依存を切るため、 Initialize で Cpu へのポインタを渡す
 		void Initialize(Cpu* pCpu);
 		// フレームシーケンサが CPU に IRQ いれる
 		void GenerateCpuInterrupt();
+		// CPU メモリ空間から読み込む(DMC の DMA 用)
+		uint8_t ReadByte(uint16_t addr);
 	private:
 		// CPU にバスを繋ぐ
 		Cpu* m_pCpu;
+		// System にもバスを繋ぐ(DMA でカセットの内容を読み取るため)
+		System* m_pSystem;
 		bool m_IsInitialized;
 	};
 

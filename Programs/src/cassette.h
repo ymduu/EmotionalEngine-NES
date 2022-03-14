@@ -40,6 +40,7 @@ namespace nes { namespace detail {
 			,m_Header{}
 			,m_PrgRomSize(0)
 			,m_ChrRomSize(0)
+			,m_BankNum(0)
 		{}
 		// ROM のバイナリを書き込んだバッファとそのサイズを引数にとって初期化
 		void Initialize(uint8_t* pBuffer, size_t bufferSize);
@@ -55,5 +56,7 @@ namespace nes { namespace detail {
 		INESHeader m_Header;
 		size_t m_PrgRomSize;
 		size_t m_ChrRomSize;
+
+		int m_BankNum;
 	};
 }}

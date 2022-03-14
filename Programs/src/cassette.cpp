@@ -33,18 +33,22 @@ namespace nes { namespace detail {
 	void Cassette::ReadPrgRom(uint8_t* pBuffer, int offset, size_t size)
 	{
 		assert(m_Initialized);
+		const int BANK_SIZE = 0x4000;
 
 		for (size_t i = 0; i < size; i++)
 		{
+			int addr = i + offset + CASSETTE_PRG_ROM_BASE;
 			// ROM が 16 KB の場合のミラーリング
-			if (i + offset >= m_PrgRomSize) 
+			if (addr >= 0xC000) 
 			{
-				size_t idx = (i + offset) % m_PrgRomSize;
-				pBuffer[i] = m_PrgRom[idx];
+				// 0xC000 以降は常に最終バンク
+				size_t bankOffset = addr - 0xC000;
+				pBuffer[i] = m_PrgRom[BANK_SIZE * 15 + bankOffset];
 			}
 			else
 			{
-				pBuffer[i] = m_PrgRom[i + offset];
+				size_t bankOffset = addr - 0x8000;
+				pBuffer[i] = m_PrgRom[BANK_SIZE * m_BankNum + bankOffset];
 			}
 		}
 	}
@@ -52,13 +56,15 @@ namespace nes { namespace detail {
 	{
 		assert(m_Initialized);
 		assert(offset + size <= m_PrgRomSize);
-		memcpy(m_PrgRom + offset, pBuffer, size);
+		// memcpy(m_PrgRom + offset, pBuffer, size);
+		// mapper 2 ではバンクを切り替える
+		m_BankNum = *pBuffer;
 	}
 	void Cassette::ReadChrRom(uint8_t* pBuffer, int offset, size_t size)
 	{
 		assert(m_Initialized);
 		// 必要なら mirror すること(必要なら assert 引っかかるはず)
-		assert(offset + size <= m_ChrRomSize);
+		// assert(offset + size <= m_ChrRomSize);
 		memcpy(pBuffer, m_ChrRom + offset, size);
 	}
 	void Cassette::WriteChrRom(const uint8_t* pBuffer, int offset, size_t size)

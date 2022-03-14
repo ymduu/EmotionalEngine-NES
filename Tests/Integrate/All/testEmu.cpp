@@ -21,7 +21,8 @@ namespace {
 		// nesFile += "/Tests/TestBinaries/giko/giko013.nes";
 		// nesFile += "/Tests/TestBinaries/rom/live_UNROM.nes";
 		// nesFile += "/Tests/TestBinaries/rom/dpcm_test.nes";
-		nesFile += "/Tests/TestBinaries/rom/mario.nes";
+		// nesFile += "/Tests/TestBinaries/rom/mario.nes";
+		nesFile += "/Tests/TestBinaries/rom/PCM.demo.wgraphics.nes";
 
 		test::ReadFile(nesFile, pOutBuf, pOutSize);
 	}

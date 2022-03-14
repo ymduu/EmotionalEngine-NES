@@ -2,7 +2,8 @@
 #include <stdint.h>
 
 namespace nes {
-	const size_t PRG_ROM_MAX = 0x8000;
+	// マッパー次第で バンク 16 個まであるかも
+	const size_t PRG_ROM_MAX = 0x8000 * 16;
 	const size_t CHR_ROM_MAX = 0x2000;
 
 	// CPU Memory Map

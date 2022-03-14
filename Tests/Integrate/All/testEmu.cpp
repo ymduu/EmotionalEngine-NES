@@ -20,8 +20,8 @@ namespace {
 		//nesFile += "/Tests/TestBinaries/rom/donkey.nes";
 		// nesFile += "/Tests/TestBinaries/giko/giko013.nes";
 		// nesFile += "/Tests/TestBinaries/rom/live_UNROM.nes";
-		nesFile += "/Tests/TestBinaries/rom/dpcm_test.nes";
-		// nesFile += "/Tests/TestBinaries/rom/mario.nes";
+		// nesFile += "/Tests/TestBinaries/rom/dpcm_test.nes";
+		nesFile += "/Tests/TestBinaries/rom/mario.nes";
 
 		test::ReadFile(nesFile, pOutBuf, pOutSize);
 	}

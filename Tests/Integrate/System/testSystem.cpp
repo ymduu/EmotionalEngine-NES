@@ -54,6 +54,11 @@ void ReadGiko005Nes(std::shared_ptr<uint8_t[]>* pOutBuf, size_t* pOutSize)
     test::ReadFile(nesFile, pOutBuf, pOutSize);
 }
 
+void AddWaveSample(int sample)
+{
+    // デバッグ用のなにもしないコールバック関数
+}
+
 // 各アドレスを読み書きする、とりあえず WRAM とカセット だけ
 void TestSystem_ReadWrite()
 {
@@ -65,8 +70,8 @@ void TestSystem_ReadWrite()
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
     nes::detail::Ppu ppu(&ppuBus);
-    nes::detail::ApuBus apuBus;
-    nes::detail::Apu apu(&apuBus);
+    nes::detail::ApuBus apuBus(&sys);
+    nes::detail::Apu apu(&apuBus, &AddWaveSample);
 
     nes::detail::CpuBus bus(&sys, &ppu, &apu);
 
@@ -112,8 +117,8 @@ void TestSystem_HelloWorld()
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
     nes::detail::Ppu ppu(&ppuBus);
-    nes::detail::ApuBus apuBus;
-    nes::detail::Apu apu(&apuBus);
+    nes::detail::ApuBus apuBus(&sys);
+    nes::detail::Apu apu(&apuBus, &AddWaveSample);
     nes::detail::CpuBus cpuBus(&sys, &ppu, &apu);
 
     nes::detail::Cpu cpu(&cpuBus);
@@ -155,8 +160,8 @@ void TestSystem_HelloWorld_Cpu_Ppu()
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
     nes::detail::Ppu ppu(&ppuBus);
-    nes::detail::ApuBus apuBus;
-    nes::detail::Apu apu(&apuBus);
+    nes::detail::ApuBus apuBus(&sys);
+    nes::detail::Apu apu(&apuBus, &AddWaveSample);
     nes::detail::CpuBus cpuBus(&sys, &ppu, &apu);
 
     nes::detail::Cpu cpu(&cpuBus);
@@ -229,8 +234,8 @@ void CreateTestCase_TestSystem_HelloWorld_Cpu_Ppu()
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
     nes::detail::Ppu ppu(&ppuBus);
-    nes::detail::ApuBus apuBus;
-    nes::detail::Apu apu(&apuBus);
+    nes::detail::ApuBus apuBus(&sys);
+    nes::detail::Apu apu(&apuBus, &AddWaveSample);
     nes::detail::CpuBus cpuBus(&sys, &ppu, &apu);
 
     nes::detail::Cpu cpu(&cpuBus);
@@ -296,8 +301,8 @@ void TestSystem_NesTest()
     nes::detail::PpuSystem ppuSys;
     nes::detail::PpuBus ppuBus(&sys, &ppuSys);
     nes::detail::Ppu ppu(&ppuBus);
-    nes::detail::ApuBus apuBus;
-    nes::detail::Apu apu(&apuBus);
+    nes::detail::ApuBus apuBus(&sys);
+    nes::detail::Apu apu(&apuBus, &AddWaveSample);
     nes::detail::CpuBus cpuBus(&sys, &ppu, &apu);
 
     nes::detail::Cpu cpu(&cpuBus);
@@ -342,7 +347,7 @@ void TestSystem_NesTest_Emulator_Log()
     size_t size;
     ReadNesTestNes(&rom, &size);
 
-    nes::Emulator emu(rom, size);
+    nes::Emulator emu(rom, size, &AddWaveSample);
 
     // 雑に 70000 命令くらいステップする
     for (int i = 0; i < 70000; i++) {
@@ -364,7 +369,7 @@ void TestSystem_Giko005()
     size_t size;
     ReadGiko005Nes(&rom, &size);
 
-    nes::Emulator emu(rom, size);
+    nes::Emulator emu(rom, size, &AddWaveSample);
 
     // 雑に 70000 命令くらいステップする
     for (int i = 0; i < 70000; i++) {

@@ -946,7 +946,7 @@ namespace nes { namespace detail {
 			}
 			else 
 			{
-				*pIsHalfFrame = true;
+				*pIsHalfFrame = false;
 			}
 
 			if (m_NextSeqPhase == 3) 
@@ -973,8 +973,9 @@ namespace nes { namespace detail {
 			if (m_NextSeqPhase == 1 || m_NextSeqPhase == 4) {
 				*pIsHalfFrame = true;
 			}
-			else {
-				*pIsHalfFrame = true;
+			else 
+			{
+				*pIsHalfFrame = false;
 			}
 
 			*pIsRaiseIrq = false;
